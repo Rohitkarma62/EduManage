@@ -1,15 +1,14 @@
 # EduManage Offline Repository Structure
 
-**Status:** proposed filesystem scaffold, reconciled against the developer reconstruction specification. This is a plan, not a verified snapshot of an implemented app.
+**Status:** Target architecture and implementation plan, reconciled against the developer reconstruction specification. This is not a verified snapshot of a completed app.
 
-## Repository contents and intent
+## Current repository checkpoint
 
-- `lib/`: Flutter/Dart application source.
-- `test/`: unit, database, migration, workflow, finance, attendance, backup/restore, licensing and UI golden tests.
-- `assets/`: bundled assets only (branding, licensed fonts/icons and local PDF templates).
-- `docs/`: approved product specification, decision log, reconciliation notes and migration evidence guidance.
-- `android/`: Flutter-generated Android platform project. Current directories are placeholders, not a complete Android runner.
-- `pubspec.yaml`, `pubspec.lock`, `analysis_options.yaml` and `lib/main.dart`: required bootstrap files that have not yet been created.
+The `phase-2/flutter-bootstrap` branch contains the Flutter package bootstrap, generated Android platform scaffold, pinned Flutter version, dependency lockfile, a minimal app shell, strict analysis options, a CI workflow and one widget smoke test. GitHub Actions run #7 passed dependency resolution, `flutter analyze`, and `flutter test`:
+
+https://github.com/Rohitkarma62/EduManage/actions/runs/37958071222
+
+This is not evidence of a complete or release-ready app. No Gradle task, Flutter build, APK, release signing, emulator run, or device test has been performed. The Android application ID and release signing are still generated placeholders.
 
 ## Target source tree
 
@@ -55,7 +54,7 @@ docs/
 ## Architecture and implementation rules
 
 - Flutter/Dart; Riverpod; GoRouter; SQLite through Drift.
-- Generate Android platform scaffolding with Flutter tooling; do not treat placeholder folders as build-ready.
+- Generate Android platform scaffolding with Flutter tooling; do not treat generated scaffolding as proof the product builds or is ready to release.
 - Keep presentation, domain/business rules, data access and infrastructure responsibilities separated.
 - Core business workflows and PDF generation must function offline. Network availability must not be a prerequisite for local CRUD, fee transactions, attendance or reports.
 - Money is stored as integer paise. Critical financial, assignment, attendance, result-publication and restore operations use explicit transaction/consistency boundaries and tests.
@@ -68,6 +67,10 @@ docs/
 
 The app will need app-private runtime locations for its SQLite database, managed files, generated documents, backups and temporary files. These are **not repository directories** and must not contain real user data in Git. Resolve platform-specific paths through the app's storage APIs and verify on Android devices.
 
-## Current readiness
+## Known scaffold items to resolve before release
+- Replace the generated Android application ID `com.example.edumanage_offline` with the agreed permanent package ID.
+- Replace the generated debug signing configuration with a properly managed release-signing process before release builds.
+- Review the broad `*.pdf` ignore rule against the intended policy for versioned product specifications and approved PDF templates; do not force-add private/generated customer documents.
 
-This repository is a filesystem/documentation scaffold only. It is not yet a compilable Flutter project. No application implementation, database schema/migration, dependency lockfile, tests or APK build is claimed.
+## Readiness
+The current branch is a verified Flutter bootstrap with static analysis and a smoke test passing. It is **not** yet the complete EduManage product: the database schema/migrations, core business workflows, backup/restore, license validation, full UI, and their corresponding tests remain unimplemented. No APK/build verification is claimed.
