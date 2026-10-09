@@ -1,0 +1,36 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# IDE and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+key.properties
+secrets/
+private_keys/
+
+# Local databases, exports, backups and generated documents
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+*.backup
+*.bak
+*.pdf
