@@ -1,9 +1,10 @@
 name: Phase 2 Flutter bootstrap
 
 on:
-  push:
+  pull_request:
     branches:
-      - phase-2/flutter-bootstrap
+      - main
+    types: [opened, synchronize, reopened]
     paths:
       - "pubspec.yaml"
       - ".fvmrc"
@@ -24,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check out work branch
+      - name: Check out pull request head
         uses: actions/checkout@v4
         with:
-          ref: phase-2/flutter-bootstrap
+          ref: ${{ github.event.pull_request.head.ref || 'phase-2/flutter-bootstrap' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install pinned Flutter SDK
