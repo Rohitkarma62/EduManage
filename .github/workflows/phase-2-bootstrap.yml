@@ -1,0 +1,71 @@
+name: Phase 2 Flutter bootstrap
+
+on:
+  push:
+    branches:
+      - phase-2/flutter-bootstrap
+    paths:
+      - "pubspec.yaml"
+      - ".fvmrc"
+      - "docs/PHASE_2_BOOTSTRAP.md"
+      - ".github/workflows/phase-2-bootstrap.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase-2-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  generate-platform-and-lockfile:
+    name: Generate Android scaffold and resolve dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out work branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase-2/flutter-bootstrap
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pinned Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+          cache: true
+
+      - name: Confirm toolchain
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Generate Android platform scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          flutter create --platforms=android --project-name edumanage_offline "$temp_dir/project"
+          rm -rf android
+          cp -a "$temp_dir/project/android" ./android
+          cp "$temp_dir/project/.metadata" ./.metadata
+
+      - name: Resolve dependencies and create lockfile
+        run: flutter pub get
+
+      - name: Commit generated platform files and lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android .metadata pubspec.lock
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git commit -m "Generate Android scaffold and resolve Flutter dependencies"
+          git push origin HEAD:phase-2/flutter-bootstrap
