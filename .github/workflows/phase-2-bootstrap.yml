@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   generate-platform-and-lockfile:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'phase-2/flutter-bootstrap'
     name: Generate Android scaffold and resolve dependencies
     runs-on: ubuntu-latest
     timeout-minutes: 30
