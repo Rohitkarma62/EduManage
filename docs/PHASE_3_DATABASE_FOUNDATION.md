@@ -9,6 +9,7 @@
 - Institute settings, students, class groups, batches, and effective-dated student assignments.
 - Foreign-key enforcement and WAL mode.
 - Basic local student create/list/find/update-contact/deactivate operations.
+- Initial student DAO test cases authored for local create/read, blank-name rejection, and soft deactivation; these tests have not been executed.
 - No network dependency and no cloud storage.
 
 ## Initial schema decisions
@@ -23,7 +24,7 @@
 
 1. Run the pinned Drift code generator and commit the generated schema code.
 2. Add schema snapshot/export and a documented migration test strategy before introducing schema version 2.
-3. Add database tests for fresh creation, foreign-key enforcement, student validation/soft deactivation, class/batch uniqueness, and assignment interval invariants.
+3. Expand database tests for fresh creation, foreign-key enforcement, class/batch uniqueness, and assignment interval invariants. The initial student DAO test file exists but has not been executed.
 4. Add assignment DAO operations with atomic overlap checks and class/batch consistency validation.
 5. Review the first schema against the approved product specification before adding financial tables. Do not invent opening-balance or refund semantics to fill schema gaps.
 6. After code generation and explicit authorization, run `flutter analyze` and `flutter test` in CI. No Gradle task, Flutter build or APK is part of this slice.
