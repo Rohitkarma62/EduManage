@@ -41,6 +41,6 @@ Run #7 completed successfully. The dependency resolution, analyzer, widget smoke
 2. [x] Dependencies resolved and `pubspec.lock` committed.
 3. [x] `flutter analyze` passed in GitHub Actions.
 4. [x] Current widget smoke test passed in GitHub Actions.
-5. [ ] Final repository/documentation consistency review and explicit readiness decision.
+5. [x] Final repository/documentation consistency review completed; bootstrap checkpoint closed with the limitations above.
 
 Do not start Phase 3 until Phase 2 is explicitly closed. Do not call this release/build-ready based on the current checks alone. No APK or Gradle build is authorized by this checkpoint.
