@@ -1,104 +1,73 @@
 # EduManage Offline Repository Structure
 
-Status: **scaffold only**. This documents the planned Flutter/Dart project layout; it does not mean application code, database migrations, tests, Android configuration, or a working APK already exist.
+**Status:** proposed filesystem scaffold, reconciled against the developer reconstruction specification. This is a plan, not a verified snapshot of an implemented app.
 
-## Planned structure
+## Repository contents and intent
+
+- `lib/`: Flutter/Dart application source.
+- `test/`: unit, database, migration, workflow, finance, attendance, backup/restore, licensing and UI golden tests.
+- `assets/`: bundled assets only (branding, licensed fonts/icons and local PDF templates).
+- `docs/`: approved product specification, decision log, reconciliation notes and migration evidence guidance.
+- `android/`: Flutter-generated Android platform project. Current directories are placeholders, not a complete Android runner.
+- `pubspec.yaml`, `pubspec.lock`, `analysis_options.yaml` and `lib/main.dart`: required bootstrap files that have not yet been created.
+
+## Target source tree
 
 ```text
-.
-├── README.md
-├── pubspec.yaml                         # to be added with dependency decisions
-├── analysis_options.yaml                # to be added
-├── lib/
-│   ├── main.dart                        # app entry point
-│   ├── app/
-│   │   ├── app.dart
-│   │   ├── router/                      # GoRouter routes, names, guards
-│   │   ├── theme/                       # colors, typography, spacing, theme
-│   │   └── startup/                     # startup controller and screen
-│   ├── core/
-│   │   ├── database/                    # Drift database, schema version, tables, DAOs, migrations, seeds
-│   │   ├── files/                       # managed files, ownership, manifest, integrity, retention
-│   │   ├── pdf/                         # offline PDF service, snapshots, templates
-│   │   ├── backup/                      # backup manifest, verification, restore service and journal
-│   │   ├── licensing/                   # payload, signature verification, entitlements, import
-│   │   ├── security/
-│   │   ├── validation/
-│   │   ├── errors/
-│   │   └── utils/
-│   ├── features/
-│   │   ├── onboarding/
-│   │   ├── dashboard/
-│   │   ├── students/
-│   │   ├── classes/
-│   │   ├── batches/
-│   │   ├── assignments/
-│   │   ├── fees/
-│   │   ├── payments/
-│   │   ├── discounts_credits/
-│   │   ├── refunds/
-│   │   ├── attendance/
-│   │   ├── reports/
-│   │   ├── staff/
-│   │   ├── salary/
-│   │   ├── expenses/
-│   │   ├── exams/
-│   │   ├── results/
-│   │   ├── certificates/
-│   │   ├── settings/
-│   │   ├── backup_restore/
-│   │   ├── license/
-│   │   └── about_diagnostics/
-│   │       # Feature modules may use presentation/, domain/, and data/
-│   └── shared/                          # widgets, forms, dialogs, states, formatters, accessibility
-├── test/
-│   ├── unit/
-│   ├── database/
-│   ├── migrations/
-│   ├── workflows/
-│   ├── financial_ledger/
-│   ├── attendance/
-│   ├── backup_restore/
-│   ├── licensing/
-│   └── golden_ui/
-├── assets/
-│   ├── branding/
-│   ├── icons/
-│   ├── fonts/
-│   └── pdf_templates/
-├── docs/
-│   ├── migration_evidence/
-│   ├── decision_log.md                   # to be added
-│   └── product_specification.pdf         # add approved specification artifact
-└── android/                              # Flutter-generated Android project configuration
+lib/
+  main.dart
+  app/
+    app.dart
+    router/             # GoRouter routes, names and entitlement/onboarding guards
+    theme/              # locked design tokens, typography, spacing, theme
+    startup/            # startup orchestration and initial screen
+  core/
+    database/           # Drift DB, schema version, tables, DAOs, migrations, seeds
+    files/              # managed-file service, ownership, manifest, integrity, retention
+    pdf/                # offline PDF service, immutable document snapshots, templates
+    backup/             # consistent DB snapshot, manifest, verification, restore journal
+    licensing/          # signed payload validation, public-key verification, entitlements
+    security/           # secret redaction and safe diagnostics
+    validation/
+    errors/
+    utils/
+  features/
+    onboarding/ dashboard/ students/ classes/ batches/ assignments/
+    fees/ payments/ discounts_credits/ refunds/ attendance/ reports/
+    staff/ salary/ expenses/ exams/ results/ certificates/ settings/
+    backup_restore/ license/ about_diagnostics/
+    # use presentation/, domain/, data/ where the feature actually needs each layer
+  shared/
+    widgets/ forms/ dialogs/ loading/ empty_states/ error_states/
+    formatters/ accessibility/
+test/
+  unit/ database/ migrations/ workflows/ financial_ledger/
+  attendance/ backup_restore/ licensing/ golden_ui/
+assets/
+  branding/ icons/ fonts/ pdf_templates/
+docs/
+  product_specification.pdf
+  decision_log.md
+  migration_evidence/
+  RECONCILIATION.md
 ```
 
-## Architectural rules
+## Architecture and implementation rules
 
-- Flutter/Dart; Riverpod for state management; GoRouter for navigation.
-- SQLite via Drift; migrations must be explicit, versioned, and tested.
-- Keep presentation, domain/business rules, and data access separated within feature modules.
-- Core workflows and PDF generation must work offline.
-- Store business data in local SQLite; managed files use a dedicated local file service.
-- Never commit passwords, production data/backups, release signing secrets, or private license-signing keys.
-- Keep this structure aligned with the approved developer specification. Pending business policies must be resolved before implementing the affected workflow.
+- Flutter/Dart; Riverpod; GoRouter; SQLite through Drift.
+- Generate Android platform scaffolding with Flutter tooling; do not treat placeholder folders as build-ready.
+- Keep presentation, domain/business rules, data access and infrastructure responsibilities separated.
+- Core business workflows and PDF generation must function offline. Network availability must not be a prerequisite for local CRUD, fee transactions, attendance or reports.
+- Money is stored as integer paise. Critical financial, assignment, attendance, result-publication and restore operations use explicit transaction/consistency boundaries and tests.
+- Generated Drift files follow one documented and pinned generation workflow.
+- Add code files when they contain real implementation, not merely to populate the tree.
+- Keep the supplied visual reference locked: navy `#17324D`, teal `#0F766E`, canvas `#F5F7FA`, white surfaces and approved navigation/screen hierarchy.
+- Never commit real student/staff data, production backups, passwords, access tokens, Android release keystores, or private license-signing keys.
 
-## Local device storage (runtime data, not repository files)
+## Runtime storage is separate from Git
 
-- `database/edumanage.sqlite`
-- `files/branding/`
-- `files/students/photos/`
-- `files/documents/`
-- `files/generated/receipts/`
-- `files/generated/reports/`
-- `files/generated/id_cards/`
-- `files/generated/certificates/`
-- `files/backups/`
-- `files/temporary/`
-- `shared_preferences/`
+The app will need app-private runtime locations for its SQLite database, managed files, generated documents, backups and temporary files. These are **not repository directories** and must not contain real user data in Git. Resolve platform-specific paths through the app's storage APIs and verify on Android devices.
 
-These are app-private runtime locations, not directories to commit with user records. The actual paths must be implemented using Android app storage APIs and verified on device.
+## Current readiness
 
-## Current limitations
-
-This scaffold intentionally contains directory placeholders only. It is not yet a compilable Flutter project because the app entry point, dependency manifest, generated Drift code, platform configuration, and feature implementation have not been created. No build or tests have been run.
+This repository is a filesystem/documentation scaffold only. It is not yet a compilable Flutter project. No application implementation, database schema/migration, dependency lockfile, tests or APK build is claimed.
