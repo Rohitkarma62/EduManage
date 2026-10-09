@@ -9,6 +9,9 @@ on:
       - "pubspec.yaml"
       - ".fvmrc"
       - "docs/PHASE_2_BOOTSTRAP.md"
+      - "lib/**"
+      - "test/**"
+      - "analysis_options.yaml"
       - ".github/workflows/phase-2-bootstrap.yml"
   workflow_dispatch:
 
@@ -56,6 +59,12 @@ jobs:
 
       - name: Resolve dependencies and create lockfile
         run: flutter pub get
+
+      - name: Analyze Dart and Flutter sources
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        run: flutter test
 
       - name: Commit generated platform files and lockfile
         shell: bash
