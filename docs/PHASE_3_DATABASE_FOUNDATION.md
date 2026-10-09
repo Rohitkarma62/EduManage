@@ -1,6 +1,6 @@
 # Phase 3: Database Foundation
 
-**Status:** In progress. Initial Drift schema and student DAO source have been added on `phase-3/database-foundation`. Generated Drift code and runtime verification have not been run. Do not describe this phase as complete yet.
+**Status:** Initial database foundation implemented and verified in GitHub Actions. The last confirmed successful CI run generated Drift code, reported no analyzer issues, and passed 7 tests. A subsequent workflow correction is now committed and must receive a fresh CI run before this checkpoint is considered reverified. This is not product-complete or release-ready.
 
 ## Scope of this first slice
 
@@ -9,28 +9,37 @@
 - Institute settings, students, class groups, batches, and effective-dated student assignments.
 - Foreign-key enforcement and WAL mode.
 - Basic local student create/list/find/update-contact/deactivate operations.
-- Initial student DAO test cases authored for local create/read, blank-name rejection, and soft deactivation; these tests have not been executed.
+- Student DAO tests for local create/read, blank-name rejection, and soft deactivation.
+- Assignment tests for adjacent half-open intervals, overlap rejection, and batch/class mismatch rejection.
 - No network dependency and no cloud storage.
+
+## Verification record
+
+- Drift generated part file `lib/core/database/app_database.g.dart` is committed.
+- Previous successful CI run: Drift code generation succeeded, `flutter analyze` reported no issues, and all 7 tests passed.
+- Workflow command has been corrected to `dart run build_runner build`; the removed `--delete-conflicting-outputs` option is not used.
+- Fresh CI verification of the latest branch commit is still required.
+- No Gradle task, Flutter APK build, or device-level test has been run.
 
 ## Initial schema decisions
 
 - Student deactivation is a soft state change; historical assignments should not be erased as a side effect.
 - Class and batch names are unique within their intended scope.
 - Student assignment intervals are half-open: `[effective_from, effective_to)`; a null end means currently open-ended.
-- `assignment_scope_key` is non-null to avoid relying on SQLite's ambiguous NULL behavior for scoped uniqueness. Assignment creation/update logic must validate class/batch consistency and reject overlapping effective intervals inside a database transaction before this can be treated as enforced.
-- Money, fee ledgers, opening balances, payments, refunds, salary, discounts/credits, exams, results, certificates, backups and licensing are intentionally not part of schema v1. They require their specific approved invariants and unresolved decisions P-01 through P-07 where applicable.
+- `assignment_scope_key` is non-null to avoid relying on SQLite's ambiguous NULL behavior for scoped uniqueness.
+- Assignment creation validates class/batch consistency and rejects overlapping intervals in a transaction.
+- Money, fee ledgers, opening balances, payments, refunds, salary, discounts/credits, exams, results, certificates, backups and licensing are intentionally not part of schema v1. They require their approved invariants and unresolved decisions P-01 through P-07 where applicable.
 
 ## Required next implementation gates
 
-1. Run the pinned Drift code generator and commit the generated schema code.
-2. Add schema snapshot/export and a documented migration test strategy before introducing schema version 2.
-3. Expand database tests for fresh creation, foreign-key enforcement, class/batch uniqueness, and assignment interval invariants. The initial student DAO test file exists but has not been executed.
-4. Add assignment DAO operations with atomic overlap checks and class/batch consistency validation.
+1. Resolve Phase 3 branch divergence with Phase 2 changes preserved; do not merge either PR as part of this repair.
+2. Obtain a fresh successful CI run against the latest Phase 3 commit.
+3. Add schema snapshot/export and a documented migration test strategy before introducing schema version 2.
+4. Expand database tests for fresh creation, foreign-key enforcement, and class/batch uniqueness.
 5. Review the first schema against the approved product specification before adding financial tables. Do not invent opening-balance or refund semantics to fill schema gaps.
-6. After code generation and explicit authorization, run `flutter analyze` and `flutter test` in CI. No Gradle task, Flutter build or APK is part of this slice.
 
 ## Important limitations
 
-- The Drift generated part file `app_database.g.dart` is not committed yet. Code generation is required before this code can compile.
 - Schema version 1 is the first development schema, not a promise of production migration compatibility. Once user data exists, schema changes require migration tests and backup/restore compatibility review.
-- No runtime database, migration, or device behavior has been verified at this stage.
+- CI tests use an in-memory SQLite database. Device-level behavior and restore/migration behavior have not been verified.
+- The current PR remains draft and must not be merged until branch integration and review gates pass.
