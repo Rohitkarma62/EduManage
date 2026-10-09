@@ -28,7 +28,7 @@ class EduManageApp extends StatelessWidget {
           foregroundColor: _navy,
           centerTitle: false,
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: Colors.white,
           elevation: 0,
           margin: EdgeInsets.zero,
