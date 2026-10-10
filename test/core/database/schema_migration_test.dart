@@ -237,4 +237,33 @@ void main() {
       throwsA(isA<Exception>()),
     );
   });
+
+  test('refuses to open a database with pre-existing foreign-key violations',
+      () async {
+    final executor = NativeDatabase.memory(
+      setup: (database) {
+        database.execute('CREATE TABLE parent_rows (id INTEGER PRIMARY KEY)');
+        database.execute('''
+          CREATE TABLE child_rows (
+            id INTEGER PRIMARY KEY,
+            parent_id INTEGER REFERENCES parent_rows(id)
+          )
+        ''');
+        // Seed corrupt legacy data before Drift enables foreign-key checks.
+        database.execute(
+          'INSERT INTO child_rows (id, parent_id) VALUES (1, 404)',
+        );
+        database.execute('PRAGMA user_version = 3');
+      },
+    );
+
+    final database = AppDatabase.forTesting(executor);
+    addTearDown(database.close);
+
+    await expectLater(
+      database.customSelect('SELECT 1').getSingle(),
+      throwsA(isA<StateError>()),
+    );
+  });
+
 }
