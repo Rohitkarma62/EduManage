@@ -43,6 +43,7 @@ class AppDatabase extends _$AppDatabase {
               await _createAssignmentScopeTriggers();
             }
             if (from < 4) {
+              await _validateExistingAssignmentDateRanges();
               await _createAssignmentDateRangeTriggers();
             }
           });
@@ -120,6 +121,19 @@ class AppDatabase extends _$AppDatabase {
       END
     ''');
   }
+  Future<void> _validateExistingAssignmentDateRanges() async {
+    final invalidRows = await customSelect('''
+      SELECT id FROM student_assignments
+      WHERE effective_to IS NOT NULL AND effective_to <= effective_from
+      LIMIT 1
+    ''', readsFrom: {}).get();
+    if (invalidRows.isNotEmpty) {
+      throw StateError(
+        'Cannot migrate database: invalid student assignment date range exists.',
+      );
+    }
+  }
+
   Future<void> _createAssignmentDateRangeTriggers() async {
     await customStatement('''
       CREATE TRIGGER student_assignments_valid_range_insert
