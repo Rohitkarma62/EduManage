@@ -2,11 +2,11 @@ import 'package:drift/native.dart';
 import 'package:edumanage_offline/core/database/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Frozen v1 DDL for the schema that existed before v2/v3 integrity triggers.
+/// Frozen v1 DDL for the schema that existed before v2/v3/v4 integrity triggers.
 /// Keep table columns, constraints, and indexes aligned with the v1 schema;
-/// v2 adds four integrity triggers; v3 adds two assignment-scope triggers.
+/// v2 adds four integrity triggers; v3 adds two assignment-scope triggers; v4 adds two date-range triggers.
 void main() {
-  test('upgrades populated v1 schema to v3 and preserves schema and data',
+  test('upgrades populated v1 schema to v4 and preserves schema and data',
       () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
@@ -133,13 +133,13 @@ void main() {
     final database = AppDatabase.forTesting(executor);
     addTearDown(database.close);
 
-    // Accessing the database runs Drift's actual v1 -> v3 migration.
+    // Accessing the database runs Drift's actual v1 -> v4 migration.
     await database.customSelect('SELECT 1').getSingle();
 
     final version = await database
         .customSelect('PRAGMA user_version', readsFrom: const {})
         .getSingle();
-    expect(version.read<int>('user_version'), 3);
+    expect(version.read<int>('user_version'), 4);
 
     final expectedIndexes = {
       'students_name_idx',
@@ -213,7 +213,9 @@ void main() {
       "'student_assignments_no_overlap_insert', "
       "'student_assignments_no_overlap_update', "
       "'student_assignments_scope_key_insert', "
-      "'student_assignments_scope_key_update')",
+      "'student_assignments_scope_key_update', "
+      "'student_assignments_valid_range_insert', "
+      "'student_assignments_valid_range_update')",
       readsFrom: const {},
     ).get();
     expect(triggers.map((row) => row.read<String>('name')).toSet(), {
@@ -223,6 +225,8 @@ void main() {
       'student_assignments_no_overlap_update',
       'student_assignments_scope_key_insert',
       'student_assignments_scope_key_update',
+      'student_assignments_valid_range_insert',
+      'student_assignments_valid_range_update',
     });
 
     // The migrated database must enforce both interval and scope-key invariants.
@@ -253,7 +257,7 @@ void main() {
         database.execute(
           'INSERT INTO child_rows (id, parent_id) VALUES (1, 404)',
         );
-        database.execute('PRAGMA user_version = 3');
+        database.execute('PRAGMA user_version = 4');
       },
     );
 
@@ -327,7 +331,7 @@ void main() {
   });
 
 
-  test('rolls back a failed v2-to-v3 migration and preserves v2 trigger behavior',
+  test('rolls back a failed v2 migration and preserves v2 trigger behavior',
       () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
