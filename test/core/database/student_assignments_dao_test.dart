@@ -30,6 +30,12 @@ void main() {
             ClassGroupsCompanion.insert(name: name),
           );
 
+  test('enables SQLite foreign-key enforcement', () async {
+    final result = await database
+        .customSelect('PRAGMA foreign_keys', readsFrom: {}).getSingle();
+    expect(result.read<int>('foreign_keys'), 1);
+  });
+
   test('accepts adjacent half-open assignment intervals', () async {
     final studentId = await createStudent();
     final classId = await createClass('Class A');
@@ -108,7 +114,44 @@ void main() {
               createdAt: Value(DateTime(2026, 1, 1)),
             ),
           ),
-      throwsA(anything),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  test('rejects duplicate class names in SQLite', () async {
+    await createClass('Class A');
+    await expectLater(
+      createClass('Class A'),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  test('rejects duplicate batch names within the same class', () async {
+    final classId = await createClass('Class A');
+    await database.into(database.batches).insert(
+          BatchesCompanion.insert(classId: classId, name: 'Morning'),
+        );
+
+    await expectLater(
+      database.into(database.batches).insert(
+            BatchesCompanion.insert(classId: classId, name: 'Morning'),
+          ),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  test('allows same batch name in different classes', () async {
+    final classA = await createClass('Class A');
+    final classB = await createClass('Class B');
+
+    await database.into(database.batches).insert(
+          BatchesCompanion.insert(classId: classA, name: 'Morning'),
+        );
+    await expectLater(
+      database.into(database.batches).insert(
+            BatchesCompanion.insert(classId: classB, name: 'Morning'),
+          ),
+      completes,
     );
   });
 
