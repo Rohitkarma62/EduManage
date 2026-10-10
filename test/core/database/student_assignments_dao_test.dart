@@ -225,4 +225,60 @@ void main() {
     );
   });
 
+
+  test('SQLite rejects update that introduces assignment overlap', () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+    final firstId = await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classId,
+      effectiveFrom: DateTime(2026, 1, 1),
+      effectiveTo: DateTime(2026, 2, 1),
+    );
+    await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classId,
+      effectiveFrom: DateTime(2026, 2, 1),
+      effectiveTo: DateTime(2026, 3, 1),
+    );
+
+    await expectLater(
+      (database.update(database.studentAssignments)
+            ..where((row) => row.id.equals(firstId)))
+          .write(
+        StudentAssignmentsCompanion(
+          effectiveTo: Value(DateTime(2026, 2, 15)),
+        ),
+      ),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  test('SQLite rejects update that changes assignment to another class batch',
+      () async {
+    final studentId = await createStudent();
+    final classA = await createClass('Class A');
+    final classB = await createClass('Class B');
+    final batchB = await database.into(database.batches).insert(
+          BatchesCompanion.insert(classId: classB, name: 'Batch B'),
+        );
+    final assignmentId = await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classA,
+      effectiveFrom: DateTime(2026, 1, 1),
+    );
+
+    await expectLater(
+      (database.update(database.studentAssignments)
+            ..where((row) => row.id.equals(assignmentId)))
+          .write(
+        StudentAssignmentsCompanion(
+          batchId: Value(batchB),
+          assignmentScopeKey: Value('batch:$batchB'),
+        ),
+      ),
+      throwsA(isA<Exception>()),
+    );
+  });
+
 }
