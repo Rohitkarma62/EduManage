@@ -32,12 +32,16 @@ class AppDatabase extends _$AppDatabase {
           await _createAssignmentScopeTriggers();
         },
         onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await _createIntegrityTriggers();
-          }
-          if (from < 3) {
-            await _createAssignmentScopeTriggers();
-          }
+          // Keep all trigger DDL in one transaction. If any statement fails,
+          // SQLite rolls back every trigger created earlier in this migration.
+          await transaction(() async {
+            if (from < 2) {
+              await _createIntegrityTriggers();
+            }
+            if (from < 3) {
+              await _createAssignmentScopeTriggers();
+            }
+          });
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
