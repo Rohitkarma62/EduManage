@@ -345,4 +345,30 @@ void main() {
     expect(row.batchId, null);
   });
 
+
+  test('SQLite rejects direct SQL assignment with mismatched scope key',
+      () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+
+    // Raw SQL bypasses DAO normalization; the database must protect the
+    // non-null scope key used by indexes and future scoped queries.
+    await expectLater(
+      database.customStatement('''
+        INSERT INTO student_assignments
+          (student_id, class_id, batch_id, assignment_scope_key,
+           effective_from, effective_to, change_reason, created_at)
+        VALUES ($studentId, $classId, NULL, 'class:999',
+                1767225600000, NULL, NULL, 1767225600000)
+      '''),
+      throwsA(isA<Exception>()),
+    );
+
+    final rows = await database.customSelect(
+      'SELECT id FROM student_assignments WHERE student_id = $studentId',
+      readsFrom: {database.studentAssignments},
+    ).get();
+    expect(rows, isEmpty);
+  });
+
 }
