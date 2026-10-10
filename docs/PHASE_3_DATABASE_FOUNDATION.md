@@ -1,45 +1,44 @@
 # Phase 3: Database Foundation
 
-**Status:** Initial database foundation implemented. The last confirmed successful CI run generated Drift code, reported no analyzer issues, and passed 7 tests at an earlier commit. A follow-up test commit now adds direct foreign-key and invalid-interval checks; a fresh CI run is required before claiming those new checks pass. This is not product-complete or release-ready.
+**Status:** Initial local database foundation implemented. SQLite-level assignment integrity triggers and a schema-version-2 upgrade path are now included. The newest changes require a fresh CI run before they can be called verified. This is not product-complete or release-ready.
 
 ## Scope of this first slice
 
 - Local SQLite database opened from app-private application-support storage.
-- Drift schema version 1.
+- Drift schema version 2. Version 2 adds SQLite triggers and upgrades existing version-1 databases without rebuilding their tables.
 - Institute settings, students, class groups, batches, and effective-dated student assignments.
-- Foreign-key enforcement and WAL mode configured for the app database connection.
+- Foreign-key enforcement enabled before normal queries; PRAGMA foreign_key_check is checked when opening the database.
 - Basic local student create/list/find/update-contact/deactivate operations.
 - Student DAO tests for local create/read, blank-name rejection, and soft deactivation.
-- Assignment tests for adjacent half-open intervals, overlap rejection, batch/class mismatch, direct foreign-key rejection, and non-positive interval rejection.
+- Assignment tests for adjacent half-open intervals, overlap rejection, batch/class mismatch, direct foreign-key rejection, uniqueness scopes, and non-positive interval rejection.
 - No network dependency and no cloud storage.
 
-## Verification record
+## Schema integrity rules
 
-- Drift generated part file `lib/core/database/app_database.g.dart` is committed.
-- Previous successful CI run: Drift code generation succeeded, `flutter analyze` reported no issues, and all 7 tests passed.
-- Workflow command is `dart run build_runner build`; it does not use the removed `--delete-conflicting-outputs` option.
-- New integrity tests are committed and await fresh CI verification.
-- No Gradle task, Flutter APK build, or device-level test has been run.
+- Class names are unique; batch names are unique within a class. The same batch name may exist in different classes.
+- Student assignment intervals are half-open: [effective_from, effective_to); a null end means currently open-ended.
+- DAO validation rejects overlapping intervals and a batch/class mismatch before writing.
+- SQLite triggers also reject overlapping assignments and batch/class mismatches for direct SQL writes, so bypassing the DAO does not bypass these invariants.
+- Foreign keys prevent assignments or batches from referencing missing rows. Foreign-key violations are checked at database open.
+- Student deactivation is a soft state change; historical assignments are not erased as a side effect.
 
-## Initial schema decisions
+## Migration policy and verification
 
-- Student deactivation is a soft state change; historical assignments should not be erased as a side effect.
-- Class and batch names are unique within their intended scope.
-- Student assignment intervals are half-open: `[effective_from, effective_to)`; a null end means currently open-ended.
-- `assignment_scope_key` is non-null to avoid relying on SQLite's ambiguous NULL behavior for scoped uniqueness.
-- Assignment creation validates class/batch consistency and rejects overlapping intervals in a transaction.
-- Money, fee ledgers, opening balances, payments, refunds, salary, discounts/credits, exams, results, certificates, backups and licensing are intentionally not part of schema v1. They require their approved invariants and unresolved decisions P-01 through P-07 where applicable.
+- Schema version 1 was the initial development schema. Version 2 adds integrity triggers.
+- onUpgrade installs the new triggers for existing version-1 databases; it does not drop or recreate user tables.
+- Keep every future schema change behind an incremented schemaVersion and an explicit onUpgrade path. Never change an already-shipped schema in place without a migration.
+- Before schema version 3, add a committed schema export and Drift migration-verifier test (including data preservation across an upgrade). The current in-memory tests validate behavior but do not yet simulate a real version-1-to-version-2 database upgrade.
+- CI runs Drift code generation, flutter analyze, and flutter test. No Gradle task, APK build, or device-level test is authorized or claimed.
+- SQLite WAL mode is enabled for the app connection. Backup/restore consistency and device-level migration behavior remain unverified.
 
-## Required next implementation gates
+## Still out of scope
 
-1. Obtain a fresh successful CI run against the latest Phase 3 commit.
-2. Add tests proving duplicate class names and duplicate batch names within the same class are rejected by SQLite; also test allowed same-named batches across different classes if that is the intended product rule.
-3. Add schema snapshot/export and a documented migration test strategy before introducing schema version 2.
-4. Review whether the database itself should enforce batch/class consistency and non-overlapping assignment intervals, rather than relying solely on DAO validation.
-5. Review the first schema against the approved product specification before adding financial tables. Do not invent opening-balance or refund semantics to fill schema gaps.
+Money, fee ledgers, opening balances, payments, refunds, salary, discounts/credits, exams, results, certificates, backups and licensing are not part of this schema slice. They require their approved invariants and unresolved decisions P-01 through P-07 where applicable. Do not invent accounting semantics to fill schema gaps.
 
-## Important limitations
+## Review gates before merge
 
-- Schema version 1 is the first development schema, not a promise of production migration compatibility. Once user data exists, schema changes require migration tests and backup/restore compatibility review.
-- CI tests use an in-memory SQLite database. Device-level behavior and restore/migration behavior have not been verified.
-- Phase 2/Phase 3 branch history was synchronized before this review. PR #2 remains draft and must not be merged until the verification and review gates pass.
+1. Fresh CI must pass on the latest Phase 3 commit.
+2. Review the version-1-to-version-2 upgrade behavior and add a migration-verifier/data-preservation test.
+3. Commit a schema export before the next schema-version change.
+4. Re-review the first schema against the approved product specification before adding financial tables.
+5. PR #2 remains draft and must not be merged as part of this work. CI success alone is not product readiness.
