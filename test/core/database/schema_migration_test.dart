@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// Keep table columns, constraints, and indexes aligned with the v1 schema;
 /// v2 adds four integrity triggers; v3 adds two assignment-scope triggers.
 void main() {
-  test('upgrades populated v1 schema to v2 and preserves schema and data',
+  test('upgrades populated v1 schema to v3 and preserves schema and data',
       () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
@@ -133,7 +133,7 @@ void main() {
     final database = AppDatabase.forTesting(executor);
     addTearDown(database.close);
 
-    // Accessing the database runs Drift's actual v1 -> v2 migration.
+    // Accessing the database runs Drift's actual v1 -> v3 migration.
     await database.customSelect('SELECT 1').getSingle();
 
     final version = await database
@@ -225,7 +225,7 @@ void main() {
       'student_assignments_scope_key_update',
     });
 
-    // The migrated database must still enforce the v2 interval invariant.
+    // The migrated database must enforce both interval and scope-key invariants.
     await expectLater(
       database.customStatement('''
         INSERT INTO student_assignments
