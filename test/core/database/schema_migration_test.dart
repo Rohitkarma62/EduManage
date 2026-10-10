@@ -45,7 +45,8 @@ void main() {
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             description TEXT,
-            is_active INTEGER NOT NULL DEFAULT 1,
+            is_active INTEGER NOT NULL DEFAULT 1
+              CHECK (is_active IN (0, 1)),
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
           )
@@ -60,7 +61,8 @@ void main() {
             class_id INTEGER NOT NULL REFERENCES class_groups(id),
             name TEXT NOT NULL,
             description TEXT,
-            is_active INTEGER NOT NULL DEFAULT 1,
+            is_active INTEGER NOT NULL DEFAULT 1
+              CHECK (is_active IN (0, 1)),
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
           )
