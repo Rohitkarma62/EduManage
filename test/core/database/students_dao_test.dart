@@ -81,6 +81,18 @@ void main() {
     expect(page.single.fullName, 'Meera');
   });
 
+  test('active student list paginates equal names in stable id order', () async {
+    final firstId = await createStudent('Aman');
+    final secondId = await createStudent('Aman');
+    final thirdId = await createStudent('Aman');
+
+    final firstPage = await studentsDao.listActive(limit: 2, offset: 0);
+    final secondPage = await studentsDao.listActive(limit: 2, offset: 2);
+
+    expect(firstPage.map((student) => student.id), [firstId, secondId]);
+    expect(secondPage.map((student) => student.id), [thirdId]);
+  });
+
   test('active student list clamps invalid pagination inputs', () async {
     await createStudent('Aman');
     await createStudent('Meera');
