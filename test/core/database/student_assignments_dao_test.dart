@@ -371,4 +371,29 @@ void main() {
     expect(rows, isEmpty);
   });
 
+
+  test('SQLite rejects direct SQL update with mismatched scope key',
+      () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+    final assignmentId = await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classId,
+      effectiveFrom: DateTime(2026, 1, 1),
+    );
+
+    await expectLater(
+      database.customStatement(
+        "UPDATE student_assignments "
+        "SET assignment_scope_key = 'class:999' WHERE id = $assignmentId",
+      ),
+      throwsA(isA<Exception>()),
+    );
+
+    final row = await (database.select(database.studentAssignments)
+          ..where((item) => item.id.equals(assignmentId)))
+        .getSingle();
+    expect(row.assignmentScopeKey, 'class:$classId');
+  });
+
 }
