@@ -27,14 +27,82 @@ class AppDatabase extends _$AppDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
-          await customStatement('PRAGMA foreign_keys = ON');
           await m.createAll();
+          await _createIntegrityTriggers();
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
           await customStatement('PRAGMA journal_mode = WAL');
+
+          final violations =
+              await customSelect('PRAGMA foreign_key_check').get();
+          if (violations.isNotEmpty) {
+            throw StateError(
+              'Database contains foreign-key violations: ${violations.length}',
+            );
+          }
         },
       );
+
+  Future<void> _createIntegrityTriggers() async {
+    await customStatement('''
+      CREATE TRIGGER student_assignments_batch_class_insert
+      BEFORE INSERT ON student_assignments
+      WHEN NEW.batch_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM batches
+        WHERE id = NEW.batch_id AND class_id = NEW.class_id
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'student assignment batch/class mismatch');
+      END
+    ''');
+
+    await customStatement('''
+      CREATE TRIGGER student_assignments_batch_class_update
+      BEFORE UPDATE OF batch_id, class_id ON student_assignments
+      WHEN NEW.batch_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM batches
+        WHERE id = NEW.batch_id AND class_id = NEW.class_id
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'student assignment batch/class mismatch');
+      END
+    ''');
+
+    await customStatement('''
+      CREATE TRIGGER student_assignments_no_overlap_insert
+      BEFORE INSERT ON student_assignments
+      WHEN EXISTS (
+        SELECT 1 FROM student_assignments existing
+        WHERE existing.student_id = NEW.student_id
+          AND (NEW.effective_to IS NULL OR
+               existing.effective_from < NEW.effective_to)
+          AND (existing.effective_to IS NULL OR
+               existing.effective_to > NEW.effective_from)
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'student assignment intervals must not overlap');
+      END
+    ''');
+
+    await customStatement('''
+      CREATE TRIGGER student_assignments_no_overlap_update
+      BEFORE UPDATE OF student_id, effective_from, effective_to
+      ON student_assignments
+      WHEN EXISTS (
+        SELECT 1 FROM student_assignments existing
+        WHERE existing.id != NEW.id
+          AND existing.student_id = NEW.student_id
+          AND (NEW.effective_to IS NULL OR
+               existing.effective_from < NEW.effective_to)
+          AND (existing.effective_to IS NULL OR
+               existing.effective_to > NEW.effective_from)
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'student assignment intervals must not overlap');
+      END
+    ''');
+  }
 }
 
 LazyDatabase _openConnection() {
