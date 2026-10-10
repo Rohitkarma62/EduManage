@@ -342,7 +342,7 @@ void main() {
           ..where((item) => item.id.equals(assignmentId)))
         .getSingle();
     expect(row.classId, classA);
-    expect(row.batchId, isNull);
+    expect(row.batchId, null);
   });
 
 }
