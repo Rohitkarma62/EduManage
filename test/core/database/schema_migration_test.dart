@@ -327,10 +327,13 @@ void main() {
   });
 
 
-  test('rolls back a failed v2-to-v3 migration and preserves v2 triggers', () async {
+  test('rolls back a failed v2-to-v3 migration and preserves v2 trigger behavior',
+      () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
-        database.execute('CREATE TABLE batches (id INTEGER PRIMARY KEY, class_id INTEGER)');
+        database.execute(
+          'CREATE TABLE batches (id INTEGER PRIMARY KEY, class_id INTEGER)',
+        );
         database.execute('''
           CREATE TABLE student_assignments (
             id INTEGER PRIMARY KEY,
@@ -348,25 +351,67 @@ void main() {
              effective_from, effective_to)
           VALUES (29, 8, 3, NULL, 'class:3', 200, NULL)
         ''');
+        database.execute(
+          'INSERT INTO batches (id, class_id) VALUES (7, 99)',
+        );
 
-        // Represent the four integrity triggers already installed by v2.
-        for (final name in [
-          'student_assignments_batch_class_insert',
-          'student_assignments_batch_class_update',
-          'student_assignments_no_overlap_insert',
-          'student_assignments_no_overlap_update',
-        ]) {
-          database.execute('''
-            CREATE TRIGGER $name
-            BEFORE INSERT ON student_assignments
-            BEGIN
-              SELECT 1;
-            END
-          ''');
-        }
+        // Install the actual v2 trigger definitions, not no-op placeholders.
+        database.execute('''
+          CREATE TRIGGER student_assignments_batch_class_insert
+          BEFORE INSERT ON student_assignments
+          WHEN NEW.batch_id IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM batches
+            WHERE id = NEW.batch_id AND class_id = NEW.class_id
+          )
+          BEGIN
+            SELECT RAISE(ABORT, 'student assignment batch/class mismatch');
+          END
+        ''');
+        database.execute('''
+          CREATE TRIGGER student_assignments_batch_class_update
+          BEFORE UPDATE OF batch_id, class_id ON student_assignments
+          WHEN NEW.batch_id IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM batches
+            WHERE id = NEW.batch_id AND class_id = NEW.class_id
+          )
+          BEGIN
+            SELECT RAISE(ABORT, 'student assignment batch/class mismatch');
+          END
+        ''');
+        database.execute('''
+          CREATE TRIGGER student_assignments_no_overlap_insert
+          BEFORE INSERT ON student_assignments
+          WHEN EXISTS (
+            SELECT 1 FROM student_assignments existing
+            WHERE existing.student_id = NEW.student_id
+              AND (NEW.effective_to IS NULL OR
+                   existing.effective_from < NEW.effective_to)
+              AND (existing.effective_to IS NULL OR
+                   existing.effective_to > NEW.effective_from)
+          )
+          BEGIN
+            SELECT RAISE(ABORT, 'student assignment intervals must not overlap');
+          END
+        ''');
+        database.execute('''
+          CREATE TRIGGER student_assignments_no_overlap_update
+          BEFORE UPDATE OF student_id, effective_from, effective_to
+          ON student_assignments
+          WHEN EXISTS (
+            SELECT 1 FROM student_assignments existing
+            WHERE existing.id != NEW.id
+              AND existing.student_id = NEW.student_id
+              AND (NEW.effective_to IS NULL OR
+                   existing.effective_from < NEW.effective_to)
+              AND (existing.effective_to IS NULL OR
+                   existing.effective_to > NEW.effective_from)
+          )
+          BEGIN
+            SELECT RAISE(ABORT, 'student assignment intervals must not overlap');
+          END
+        ''');
 
-        // Collide with the second v3 trigger. The first v3 trigger must be
-        // rolled back, while the v2 schema and this pre-existing trigger stay.
+        // Force failure on the second v3 trigger after the first is created.
         database.execute('''
           CREATE TRIGGER student_assignments_scope_key_update
           BEFORE UPDATE ON student_assignments
@@ -398,18 +443,60 @@ void main() {
     expect(assignmentRows.single['assignment_scope_key'], 'class:3');
 
     final triggerRows = await executor.runSelect(
-      "SELECT name FROM sqlite_master WHERE type = 'trigger'",
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger'",
       const [],
     );
-    final triggerNames = triggerRows.map((row) => row['name'] as String).toSet();
-    expect(triggerNames, containsAll({
+    final triggerSql = {
+      for (final row in triggerRows)
+        row['name'] as String: row['sql'] as String,
+    };
+    expect(triggerSql.keys, containsAll({
       'student_assignments_batch_class_insert',
       'student_assignments_batch_class_update',
       'student_assignments_no_overlap_insert',
       'student_assignments_no_overlap_update',
       'student_assignments_scope_key_update',
     }));
-    expect(triggerNames, isNot(contains('student_assignments_scope_key_insert')));
+    expect(
+      triggerSql,
+      isNot(contains('student_assignments_scope_key_insert')),
+    );
+
+    // Verify preserved v2 trigger definitions still enforce their invariants.
+    await expectLater(
+      executor.runCustom('''
+        INSERT INTO student_assignments
+          (id, student_id, class_id, batch_id, assignment_scope_key,
+           effective_from, effective_to)
+        VALUES (30, 8, 3, 7, 'batch:7', 400, NULL)
+      ''', const []),
+      throwsA(isA<Exception>()),
+    );
+    await expectLater(
+      executor.runCustom('''
+        INSERT INTO student_assignments
+          (id, student_id, class_id, batch_id, assignment_scope_key,
+           effective_from, effective_to)
+        VALUES (31, 8, 3, NULL, 'class:3', 300, NULL)
+      ''', const []),
+      throwsA(isA<Exception>()),
+    );
+    await expectLater(
+      executor.runCustom('''
+        UPDATE student_assignments
+        SET batch_id = 7, class_id = 3
+        WHERE id = 29
+      ''', const []),
+      throwsA(isA<Exception>()),
+    );
+    await expectLater(
+      executor.runCustom('''
+        UPDATE student_assignments
+        SET effective_from = 150
+        WHERE id = 29
+      ''', const []),
+      throwsA(isA<Exception>()),
+    );
   });
 
 }
