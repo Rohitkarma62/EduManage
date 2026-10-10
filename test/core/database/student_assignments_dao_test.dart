@@ -202,6 +202,52 @@ void main() {
     );
   });
 
+  test('SQLite rejects direct insert with a zero-length or reversed interval', () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+
+    for (final range in [
+      (from: 1767225600000, to: 1767225600000),
+      (from: 1769904000000, to: 1767225600000),
+    ]) {
+      await expectLater(
+        database.customStatement('''
+          INSERT INTO student_assignments
+            (student_id, class_id, batch_id, assignment_scope_key,
+             effective_from, effective_to, change_reason, created_at)
+          VALUES ($studentId, $classId, NULL, 'class:$classId',
+                  ${range.from}, ${range.to}, NULL, 1767225600000)
+        '''),
+        throwsA(isA<Exception>()),
+      );
+    }
+
+    final rows = await database.select(database.studentAssignments).get();
+    expect(rows, isEmpty);
+  });
+
+  test('SQLite rejects direct update that creates an invalid interval', () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+    final id = await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classId,
+      effectiveFrom: DateTime(2026, 1, 1),
+      effectiveTo: DateTime(2026, 3, 1),
+    );
+
+    await expectLater(
+      database.customStatement(
+        'UPDATE student_assignments SET effective_to = effective_from WHERE id = $id',
+      ),
+      throwsA(isA<Exception>()),
+    );
+    final row = await (database.select(database.studentAssignments)
+          ..where((assignment) => assignment.id.equals(id)))
+        .getSingle();
+    expect(row.effectiveTo, DateTime(2026, 3, 1));
+  });
+
   test('SQLite rejects direct assignment with mismatched batch and class',
       () async {
     final studentId = await createStudent();
