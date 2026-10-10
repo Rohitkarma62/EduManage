@@ -169,4 +169,60 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('SQLite rejects direct assignment with mismatched batch and class',
+      () async {
+    final studentId = await createStudent();
+    final classA = await createClass('Class A');
+    final classB = await createClass('Class B');
+    final batchB = await database.into(database.batches).insert(
+          BatchesCompanion.insert(classId: classB, name: 'Batch B'),
+        );
+
+    await expectLater(
+      database.into(database.studentAssignments).insert(
+            StudentAssignmentsCompanion.insert(
+              studentId: studentId,
+              classId: classA,
+              batchId: Value(batchB),
+              assignmentScopeKey: 'batch:$batchB',
+              effectiveFrom: DateTime(2026, 1, 1),
+              effectiveTo: const Value(null),
+              changeReason: const Value(null),
+              createdAt: Value(DateTime(2026, 1, 1)),
+            ),
+          ),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  test('SQLite rejects overlapping assignments inserted outside the DAO',
+      () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+
+    await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classId,
+      effectiveFrom: DateTime(2026, 1, 1),
+      effectiveTo: DateTime(2026, 3, 1),
+    );
+
+    await expectLater(
+      database.into(database.studentAssignments).insert(
+            StudentAssignmentsCompanion.insert(
+              studentId: studentId,
+              classId: classId,
+              batchId: const Value(null),
+              assignmentScopeKey: 'class:$classId',
+              effectiveFrom: DateTime(2026, 2, 1),
+              effectiveTo: const Value(null),
+              changeReason: const Value(null),
+              createdAt: Value(DateTime(2026, 2, 1)),
+            ),
+          ),
+      throwsA(isA<Exception>()),
+    );
+  });
+
 }
