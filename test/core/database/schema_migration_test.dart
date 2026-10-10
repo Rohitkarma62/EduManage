@@ -326,4 +326,90 @@ void main() {
     expect(triggerRows, isEmpty);
   });
 
+
+  test('rolls back a failed v2-to-v3 migration and preserves v2 triggers', () async {
+    final executor = NativeDatabase.memory(
+      setup: (database) {
+        database.execute('CREATE TABLE batches (id INTEGER PRIMARY KEY, class_id INTEGER)');
+        database.execute('''
+          CREATE TABLE student_assignments (
+            id INTEGER PRIMARY KEY,
+            student_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            batch_id INTEGER,
+            assignment_scope_key TEXT NOT NULL,
+            effective_from INTEGER NOT NULL,
+            effective_to INTEGER
+          )
+        ''');
+        database.execute('''
+          INSERT INTO student_assignments
+            (id, student_id, class_id, batch_id, assignment_scope_key,
+             effective_from, effective_to)
+          VALUES (29, 8, 3, NULL, 'class:3', 200, NULL)
+        ''');
+
+        // Represent the four integrity triggers already installed by v2.
+        for (final name in [
+          'student_assignments_batch_class_insert',
+          'student_assignments_batch_class_update',
+          'student_assignments_no_overlap_insert',
+          'student_assignments_no_overlap_update',
+        ]) {
+          database.execute('''
+            CREATE TRIGGER $name
+            BEFORE INSERT ON student_assignments
+            BEGIN
+              SELECT 1;
+            END
+          ''');
+        }
+
+        // Collide with the second v3 trigger. The first v3 trigger must be
+        // rolled back, while the v2 schema and this pre-existing trigger stay.
+        database.execute('''
+          CREATE TRIGGER student_assignments_scope_key_update
+          BEFORE UPDATE ON student_assignments
+          BEGIN
+            SELECT 1;
+          END
+        ''');
+        database.execute('PRAGMA user_version = 2');
+      },
+    );
+
+    final database = AppDatabase.forTesting(executor);
+    addTearDown(database.close);
+
+    await expectLater(
+      database.customSelect('SELECT 1').getSingle(),
+      throwsA(isA<Exception>()),
+    );
+
+    // Drift's open failed, so inspect SQLite directly through the executor.
+    final versionRows = await executor.runSelect('PRAGMA user_version', const []);
+    expect(versionRows.single['user_version'], 2);
+
+    final assignmentRows = await executor.runSelect(
+      'SELECT id, assignment_scope_key FROM student_assignments WHERE id = ?',
+      [29],
+    );
+    expect(assignmentRows.single['id'], 29);
+    expect(assignmentRows.single['assignment_scope_key'], 'class:3');
+
+    final triggerRows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger'",
+      const [],
+    );
+    final triggerNames = triggerRows.map((row) => row['name'] as String).toSet();
+    expect(triggerNames, containsAll({
+      'student_assignments_batch_class_insert',
+      'student_assignments_batch_class_update',
+      'student_assignments_no_overlap_insert',
+      'student_assignments_no_overlap_update',
+      'student_assignments_scope_key_update',
+    }));
+    expect(triggerNames, isNot(contains('student_assignments_scope_key_insert')));
+  });
+
 }
