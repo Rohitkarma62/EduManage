@@ -313,4 +313,36 @@ void main() {
     );
   });
 
+
+  test('SQLite rejects direct SQL update with mismatched batch and class',
+      () async {
+    final studentId = await createStudent();
+    final classA = await createClass('Class A');
+    final classB = await createClass('Class B');
+    final batchB = await database.into(database.batches).insert(
+          BatchesCompanion.insert(classId: classB, name: 'Batch B'),
+        );
+    final assignmentId = await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classA,
+      effectiveFrom: DateTime(2026, 1, 1),
+    );
+
+    // Bypass Drift's update builder and DAO checks: SQLite must enforce
+    // batch/class consistency even for raw SQL issued by another code path.
+    await expectLater(
+      database.customStatement(
+        'UPDATE student_assignments SET batch_id = $batchB '
+        'WHERE id = $assignmentId',
+      ),
+      throwsA(isA<Exception>()),
+    );
+
+    final row = await (database.select(database.studentAssignments)
+          ..where((item) => item.id.equals(assignmentId)))
+        .getSingle();
+    expect(row.classId, classA);
+    expect(row.batchId, isNull);
+  });
+
 }
