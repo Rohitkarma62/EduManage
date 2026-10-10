@@ -498,7 +498,7 @@ void main() {
     await expectLater(
       executor.runCustom('''
         UPDATE student_assignments
-        SET effective_to = 400
+        SET effective_to = 600
         WHERE id = 29
       ''', const []),
       throwsA(isA<Exception>()),
