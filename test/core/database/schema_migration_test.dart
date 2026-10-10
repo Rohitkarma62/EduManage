@@ -229,14 +229,33 @@ void main() {
       'student_assignments_valid_range_update',
     });
 
-    // The migrated database must enforce both interval and scope-key invariants.
+    // Seed a second student so the date-range assertion cannot be satisfied
+    // accidentally by the existing student's overlap constraint.
+    await database.customStatement('''
+      INSERT INTO students
+        (id, full_name, joined_at, is_active, created_at, updated_at)
+      VALUES (12, 'Range Test Student', 1767225600000, 1,
+              1767225600000, 1767225600000)
+    ''');
+
+    // The migrated database must enforce interval, scope-key, and date-range invariants.
     await expectLater(
       database.customStatement('''
         INSERT INTO student_assignments
           (student_id, class_id, batch_id, assignment_scope_key,
            effective_from, effective_to, change_reason, created_at)
-        VALUES (11, 13, NULL, 'class:13', 1769904000000, NULL, NULL,
-                1769904000000)
+        VALUES (12, 13, NULL, 'class:13', 1767225600000, 1767225600000,
+                NULL, 1767225600000)
+      '''),
+      throwsA(isA<Exception>()),
+    );
+    await expectLater(
+      database.customStatement('''
+        INSERT INTO student_assignments
+          (student_id, class_id, batch_id, assignment_scope_key,
+           effective_from, effective_to, change_reason, created_at)
+        VALUES (12, 13, NULL, 'class:13', 1769904000000, 1767225600000,
+                NULL, 1767225600000)
       '''),
       throwsA(isA<Exception>()),
     );
