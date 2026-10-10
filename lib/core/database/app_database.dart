@@ -22,17 +22,21 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
           await _createIntegrityTriggers();
+          await _createAssignmentScopeTriggers();
         },
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await _createIntegrityTriggers();
+          }
+          if (from < 3) {
+            await _createAssignmentScopeTriggers();
           }
         },
         beforeOpen: (details) async {
@@ -105,6 +109,32 @@ class AppDatabase extends _$AppDatabase {
       )
       BEGIN
         SELECT RAISE(ABORT, 'student assignment intervals must not overlap');
+      END
+    ''');
+  }
+  Future<void> _createAssignmentScopeTriggers() async {
+    await customStatement('''
+      CREATE TRIGGER student_assignments_scope_key_insert
+      BEFORE INSERT ON student_assignments
+      WHEN NEW.assignment_scope_key != CASE
+        WHEN NEW.batch_id IS NULL THEN 'class:' || NEW.class_id
+        ELSE 'batch:' || NEW.batch_id
+      END
+      BEGIN
+        SELECT RAISE(ABORT, 'student assignment scope key mismatch');
+      END
+    ''');
+
+    await customStatement('''
+      CREATE TRIGGER student_assignments_scope_key_update
+      BEFORE UPDATE OF batch_id, class_id, assignment_scope_key
+      ON student_assignments
+      WHEN NEW.assignment_scope_key != CASE
+        WHEN NEW.batch_id IS NULL THEN 'class:' || NEW.class_id
+        ELSE 'batch:' || NEW.batch_id
+      END
+      BEGIN
+        SELECT RAISE(ABORT, 'student assignment scope key mismatch');
       END
     ''');
   }
