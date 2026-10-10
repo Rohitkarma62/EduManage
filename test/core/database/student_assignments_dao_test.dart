@@ -57,6 +57,38 @@ void main() {
     );
   });
 
+  test('SQLite allows adjacent half-open intervals from direct SQL',
+      () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+
+    await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classId,
+      effectiveFrom: DateTime(2026, 1, 1),
+      effectiveTo: DateTime(2026, 2, 1),
+    );
+
+    // Bypass the DAO to verify the SQLite trigger uses strict overlap checks:
+    // [Jan 1, Feb 1) and [Feb 1, infinity) do not overlap.
+    await expectLater(
+      database.customStatement('''
+        INSERT INTO student_assignments
+          (student_id, class_id, batch_id, assignment_scope_key,
+           effective_from, effective_to, change_reason, created_at)
+        VALUES ($studentId, $classId, NULL, 'class:$classId',
+                1769904000000, NULL, NULL, 1769904000000)
+      '''),
+      completes,
+    );
+
+    final rows = await database.customSelect(
+      'SELECT id FROM student_assignments WHERE student_id = $studentId',
+      readsFrom: {database.studentAssignments},
+    ).get();
+    expect(rows, hasLength(2));
+  });
+
   test('rejects overlapping assignment intervals', () async {
     final studentId = await createStudent();
     final classId = await createClass('Class A');
