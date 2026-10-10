@@ -15,7 +15,10 @@ class StudentsDao {
 
     return (_db.select(_db.students)
           ..where((student) => student.isActive.equals(true))
-          ..orderBy([(student) => OrderingTerm.asc(student.fullName)])
+          ..orderBy([
+            (student) => OrderingTerm.asc(student.fullName),
+            (student) => OrderingTerm.asc(student.id),
+          ])
           ..limit(safeLimit, offset: safeOffset))
         .get();
   }
