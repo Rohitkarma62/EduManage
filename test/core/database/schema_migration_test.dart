@@ -2,31 +2,35 @@ import 'package:drift/native.dart';
 import 'package:edumanage_offline/core/database/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Builds the schema as it existed at version 1, before integrity triggers
-/// were introduced in version 2. Seeded rows must survive the real upgrade.
+/// Frozen v1 DDL for the schema that existed before v2 integrity triggers.
+/// Keep table columns, constraints, and indexes aligned with the v1 schema;
+/// the only v2 schema addition is the four SQLite integrity triggers.
 void main() {
-  test('upgrades a populated v1 database to v2 without losing data', () async {
+  test('upgrades populated v1 schema to v2 and preserves schema and data',
+      () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
         database.execute('''
           CREATE TABLE institute_settings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            institute_name TEXT NOT NULL,
-            owner_name TEXT,
-            phone TEXT,
-            address TEXT,
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            institute_name TEXT NOT NULL
+              CHECK (length(institute_name) >= 1 AND length(institute_name) <= 160),
+            owner_name TEXT CHECK (length(owner_name) <= 160),
+            phone TEXT CHECK (length(phone) <= 32),
+            address TEXT CHECK (length(address) <= 500),
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
           )
         ''');
         database.execute('''
           CREATE TABLE students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            phone TEXT,
-            guardian_name TEXT,
-            guardian_phone TEXT,
-            address TEXT,
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL
+              CHECK (length(full_name) >= 1 AND length(full_name) <= 160),
+            phone TEXT CHECK (length(phone) <= 32),
+            guardian_name TEXT CHECK (length(guardian_name) <= 160),
+            guardian_phone TEXT CHECK (length(guardian_phone) <= 32),
+            address TEXT CHECK (length(address) <= 500),
             date_of_birth INTEGER,
             joined_at INTEGER NOT NULL,
             is_active INTEGER NOT NULL DEFAULT 1,
@@ -34,17 +38,16 @@ void main() {
             updated_at INTEGER NOT NULL
           )
         ''');
-        database.execute('''
-          CREATE INDEX students_name_idx ON students (full_name)
-        ''');
-        database.execute('''
-          CREATE INDEX students_phone_idx ON students (phone)
-        ''');
+        database.execute(
+            'CREATE INDEX students_name_idx ON students (full_name)');
+        database.execute(
+            'CREATE INDEX students_phone_idx ON students (phone)');
         database.execute('''
           CREATE TABLE class_groups (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            description TEXT,
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL
+              CHECK (length(name) >= 1 AND length(name) <= 100),
+            description TEXT CHECK (length(description) <= 500),
             is_active INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
@@ -56,10 +59,11 @@ void main() {
         ''');
         database.execute('''
           CREATE TABLE batches (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             class_id INTEGER NOT NULL REFERENCES class_groups(id),
-            name TEXT NOT NULL,
-            description TEXT,
+            name TEXT NOT NULL
+              CHECK (length(name) >= 1 AND length(name) <= 100),
+            description TEXT CHECK (length(description) <= 500),
             is_active INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
@@ -71,16 +75,18 @@ void main() {
         ''');
         database.execute('''
           CREATE TABLE student_assignments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             student_id INTEGER NOT NULL REFERENCES students(id)
               ON DELETE RESTRICT,
             class_id INTEGER NOT NULL REFERENCES class_groups(id)
               ON DELETE RESTRICT,
             batch_id INTEGER REFERENCES batches(id) ON DELETE RESTRICT,
-            assignment_scope_key TEXT NOT NULL,
+            assignment_scope_key TEXT NOT NULL
+              CHECK (length(assignment_scope_key) >= 1 AND
+                     length(assignment_scope_key) <= 80),
             effective_from INTEGER NOT NULL,
             effective_to INTEGER,
-            change_reason TEXT,
+            change_reason TEXT CHECK (length(change_reason) <= 500),
             created_at INTEGER NOT NULL
           )
         ''');
@@ -93,7 +99,7 @@ void main() {
           ON student_assignments (assignment_scope_key, effective_from)
         ''');
 
-        // Drift uses PRAGMA user_version to identify the database schema.
+        // Drift identifies schema versions with PRAGMA user_version.
         database.execute('PRAGMA user_version = 1');
         database.execute('''
           INSERT INTO institute_settings
@@ -130,7 +136,7 @@ void main() {
     final database = AppDatabase.forTesting(executor);
     addTearDown(database.close);
 
-    // Opening AppDatabase runs the actual Drift v1 -> v2 migration.
+    // Accessing the database runs Drift's actual v1 -> v2 migration.
     await database.customSelect('SELECT 1').getSingle();
 
     final version = await database
@@ -138,37 +144,68 @@ void main() {
         .getSingle();
     expect(version.read<int>('user_version'), 2);
 
-    final institute = await database
-        .customSelect(
-          "SELECT institute_name, owner_name FROM institute_settings WHERE id = 7",
-          readsFrom: const {},
-        )
-        .getSingle();
+    final expectedIndexes = {
+      'students_name_idx',
+      'students_phone_idx',
+      'class_groups_name_unique',
+      'batches_class_name_unique',
+      'student_assignments_student_start_idx',
+      'student_assignments_scope_start_idx',
+    };
+    final indexes = await database.customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%'",
+      readsFrom: const {},
+    ).get();
+    expect(indexes.map((row) => row.read<String>('name')).toSet(),
+        expectedIndexes);
+
+    final institute = await database.customSelect(
+      'SELECT institute_name, owner_name, phone, address '
+      'FROM institute_settings WHERE id = 7',
+      readsFrom: const {},
+    ).getSingle();
     expect(institute.read<String>('institute_name'), 'Legacy Institute');
     expect(institute.read<String>('owner_name'), 'Legacy Owner');
+    expect(institute.read<String>('phone'), '9876543210');
+    expect(institute.read<String>('address'), 'Old address');
 
-    final student = await database
-        .customSelect(
-          'SELECT id, full_name, phone FROM students WHERE id = 11',
-          readsFrom: const {},
-        )
-        .getSingle();
+    final student = await database.customSelect(
+      'SELECT id, full_name, phone, is_active FROM students WHERE id = 11',
+      readsFrom: const {},
+    ).getSingle();
     expect(student.read<int>('id'), 11);
     expect(student.read<String>('full_name'), 'Legacy Student');
     expect(student.read<String>('phone'), '9876543210');
+    expect(student.read<int>('is_active'), 1);
 
-    final assignment = await database
-        .customSelect(
-          'SELECT id, student_id, class_id, batch_id, assignment_scope_key, '
-          'change_reason FROM student_assignments WHERE id = 19',
-          readsFrom: const {},
-        )
-        .getSingle();
+    final classRow = await database.customSelect(
+      'SELECT id, name FROM class_groups WHERE id = 13',
+      readsFrom: const {},
+    ).getSingle();
+    expect(classRow.read<int>('id'), 13);
+    expect(classRow.read<String>('name'), 'Legacy Class');
+
+    final batch = await database.customSelect(
+      'SELECT id, class_id, name FROM batches WHERE id = 17',
+      readsFrom: const {},
+    ).getSingle();
+    expect(batch.read<int>('id'), 17);
+    expect(batch.read<int>('class_id'), 13);
+    expect(batch.read<String>('name'), 'Legacy Batch');
+
+    final assignment = await database.customSelect(
+      'SELECT id, student_id, class_id, batch_id, assignment_scope_key, '
+      'effective_from, effective_to, change_reason FROM student_assignments '
+      'WHERE id = 19',
+      readsFrom: const {},
+    ).getSingle();
     expect(assignment.read<int>('id'), 19);
     expect(assignment.read<int>('student_id'), 11);
     expect(assignment.read<int>('class_id'), 13);
     expect(assignment.read<int>('batch_id'), 17);
     expect(assignment.read<String>('assignment_scope_key'), 'batch:17');
+    expect(assignment.read<int>('effective_from'), 1767225600000);
+    expect(assignment.readNullable<int>('effective_to'), isNull);
     expect(assignment.read<String>('change_reason'), 'Legacy assignment');
 
     final triggers = await database.customSelect(
@@ -187,7 +224,7 @@ void main() {
       'student_assignments_no_overlap_update',
     });
 
-    // The migrated database must still enforce the v2 integrity rules.
+    // The migrated database must still enforce the v2 interval invariant.
     await expectLater(
       database.customStatement('''
         INSERT INTO student_assignments
