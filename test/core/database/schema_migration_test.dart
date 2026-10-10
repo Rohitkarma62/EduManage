@@ -2,9 +2,9 @@ import 'package:drift/native.dart';
 import 'package:edumanage_offline/core/database/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Frozen v1 DDL for the schema that existed before v2 integrity triggers.
+/// Frozen v1 DDL for the schema that existed before v2/v3 integrity triggers.
 /// Keep table columns, constraints, and indexes aligned with the v1 schema;
-/// the only v2 schema addition is the four SQLite integrity triggers.
+/// v2 adds four integrity triggers; v3 adds two assignment-scope triggers.
 void main() {
   test('upgrades populated v1 schema to v2 and preserves schema and data',
       () async {
@@ -139,7 +139,7 @@ void main() {
     final version = await database
         .customSelect('PRAGMA user_version', readsFrom: const {})
         .getSingle();
-    expect(version.read<int>('user_version'), 2);
+    expect(version.read<int>('user_version'), 3);
 
     final expectedIndexes = {
       'students_name_idx',
@@ -211,7 +211,9 @@ void main() {
       "'student_assignments_batch_class_insert', "
       "'student_assignments_batch_class_update', "
       "'student_assignments_no_overlap_insert', "
-      "'student_assignments_no_overlap_update')",
+      "'student_assignments_no_overlap_update', "
+      "'student_assignments_scope_key_insert', "
+      "'student_assignments_scope_key_update')",
       readsFrom: const {},
     ).get();
     expect(triggers.map((row) => row.read<String>('name')).toSet(), {
@@ -219,6 +221,8 @@ void main() {
       'student_assignments_batch_class_update',
       'student_assignments_no_overlap_insert',
       'student_assignments_no_overlap_update',
+      'student_assignments_scope_key_insert',
+      'student_assignments_scope_key_update',
     });
 
     // The migrated database must still enforce the v2 interval invariant.
