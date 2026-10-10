@@ -13,11 +13,10 @@ void main() {
         database.execute('''
           CREATE TABLE institute_settings (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            institute_name TEXT NOT NULL
-              CHECK (length(institute_name) >= 1 AND length(institute_name) <= 160),
-            owner_name TEXT CHECK (length(owner_name) <= 160),
-            phone TEXT CHECK (length(phone) <= 32),
-            address TEXT CHECK (length(address) <= 500),
+            institute_name TEXT NOT NULL,
+            owner_name TEXT,
+            phone TEXT,
+            address TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
           )
@@ -25,12 +24,11 @@ void main() {
         database.execute('''
           CREATE TABLE students (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL
-              CHECK (length(full_name) >= 1 AND length(full_name) <= 160),
-            phone TEXT CHECK (length(phone) <= 32),
-            guardian_name TEXT CHECK (length(guardian_name) <= 160),
-            guardian_phone TEXT CHECK (length(guardian_phone) <= 32),
-            address TEXT CHECK (length(address) <= 500),
+            full_name TEXT NOT NULL,
+            phone TEXT,
+            guardian_name TEXT,
+            guardian_phone TEXT,
+            address TEXT,
             date_of_birth INTEGER,
             joined_at INTEGER NOT NULL,
             is_active INTEGER NOT NULL DEFAULT 1,
@@ -45,9 +43,8 @@ void main() {
         database.execute('''
           CREATE TABLE class_groups (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL
-              CHECK (length(name) >= 1 AND length(name) <= 100),
-            description TEXT CHECK (length(description) <= 500),
+            name TEXT NOT NULL,
+            description TEXT,
             is_active INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
@@ -61,9 +58,8 @@ void main() {
           CREATE TABLE batches (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             class_id INTEGER NOT NULL REFERENCES class_groups(id),
-            name TEXT NOT NULL
-              CHECK (length(name) >= 1 AND length(name) <= 100),
-            description TEXT CHECK (length(description) <= 500),
+            name TEXT NOT NULL,
+            description TEXT,
             is_active INTEGER NOT NULL DEFAULT 1,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
@@ -81,12 +77,10 @@ void main() {
             class_id INTEGER NOT NULL REFERENCES class_groups(id)
               ON DELETE RESTRICT,
             batch_id INTEGER REFERENCES batches(id) ON DELETE RESTRICT,
-            assignment_scope_key TEXT NOT NULL
-              CHECK (length(assignment_scope_key) >= 1 AND
-                     length(assignment_scope_key) <= 80),
+            assignment_scope_key TEXT NOT NULL,
             effective_from INTEGER NOT NULL,
             effective_to INTEGER,
-            change_reason TEXT CHECK (length(change_reason) <= 500),
+            change_reason TEXT,
             created_at INTEGER NOT NULL
           )
         ''');
