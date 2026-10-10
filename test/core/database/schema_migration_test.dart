@@ -31,7 +31,8 @@ void main() {
             address TEXT,
             date_of_birth INTEGER,
             joined_at INTEGER NOT NULL,
-            is_active INTEGER NOT NULL DEFAULT 1,
+            is_active INTEGER NOT NULL DEFAULT 1
+              CHECK (is_active IN (0, 1)),
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
           )
