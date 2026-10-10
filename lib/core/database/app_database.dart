@@ -22,7 +22,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -30,6 +30,7 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
           await _createIntegrityTriggers();
           await _createAssignmentScopeTriggers();
+          await _createAssignmentDateRangeTriggers();
         },
         onUpgrade: (m, from, to) async {
           // Keep all trigger DDL in one transaction. If any statement fails,
@@ -40,6 +41,9 @@ class AppDatabase extends _$AppDatabase {
             }
             if (from < 3) {
               await _createAssignmentScopeTriggers();
+            }
+            if (from < 4) {
+              await _createAssignmentDateRangeTriggers();
             }
           });
         },
@@ -116,6 +120,28 @@ class AppDatabase extends _$AppDatabase {
       END
     ''');
   }
+  Future<void> _createAssignmentDateRangeTriggers() async {
+    await customStatement('''
+      CREATE TRIGGER student_assignments_valid_range_insert
+      BEFORE INSERT ON student_assignments
+      WHEN NEW.effective_to IS NOT NULL
+        AND NEW.effective_to <= NEW.effective_from
+      BEGIN
+        SELECT RAISE(ABORT, 'student assignment effective_to must be after effective_from');
+      END
+    ''');
+
+    await customStatement('''
+      CREATE TRIGGER student_assignments_valid_range_update
+      BEFORE UPDATE OF effective_from, effective_to ON student_assignments
+      WHEN NEW.effective_to IS NOT NULL
+        AND NEW.effective_to <= NEW.effective_from
+      BEGIN
+        SELECT RAISE(ABORT, 'student assignment effective_to must be after effective_from');
+      END
+    ''');
+  }
+
   Future<void> _createAssignmentScopeTriggers() async {
     await customStatement('''
       CREATE TRIGGER student_assignments_scope_key_insert
