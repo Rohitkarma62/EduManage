@@ -396,4 +396,57 @@ void main() {
     expect(row.assignmentScopeKey, 'class:$classId');
   });
 
+
+  test('rejects missing student, class, and batch without partial writes',
+      () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+
+    await expectLater(
+      assignmentsDao.assign(
+        studentId: 999999,
+        classId: classId,
+        effectiveFrom: DateTime(2026, 4, 1),
+      ),
+      throwsArgumentError,
+    );
+    await expectLater(
+      assignmentsDao.assign(
+        studentId: studentId,
+        classId: 999999,
+        effectiveFrom: DateTime(2026, 4, 1),
+      ),
+      throwsArgumentError,
+    );
+    await expectLater(
+      assignmentsDao.assign(
+        studentId: studentId,
+        classId: classId,
+        batchId: 999999,
+        effectiveFrom: DateTime(2026, 4, 1),
+      ),
+      throwsArgumentError,
+    );
+
+    final rows = await (database.select(database.studentAssignments)).get();
+    expect(rows, isEmpty);
+  });
+
+  test('normalizes blank assignment change reasons to null', () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+
+    final assignmentId = await assignmentsDao.assign(
+      studentId: studentId,
+      classId: classId,
+      effectiveFrom: DateTime(2026, 4, 1),
+      changeReason: '   ',
+    );
+
+    final row = await (database.select(database.studentAssignments)
+          ..where((item) => item.id.equals(assignmentId)))
+        .getSingle();
+    expect(row.changeReason, isNull);
+  });
+
 }
