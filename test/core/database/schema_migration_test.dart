@@ -349,11 +349,17 @@ void main() {
           INSERT INTO student_assignments
             (id, student_id, class_id, batch_id, assignment_scope_key,
              effective_from, effective_to)
-          VALUES (29, 8, 3, NULL, 'class:3', 200, NULL)
+          VALUES (29, 8, 3, NULL, 'class:3', 200, 250)
         ''');
         database.execute(
           'INSERT INTO batches (id, class_id) VALUES (7, 99)',
         );
+        database.execute('''
+          INSERT INTO student_assignments
+            (id, student_id, class_id, batch_id, assignment_scope_key,
+             effective_from, effective_to)
+          VALUES (32, 8, 3, NULL, 'class:3', 300, 500)
+        ''');
 
         // Install the actual v2 trigger definitions, not no-op placeholders.
         database.execute('''
@@ -477,7 +483,7 @@ void main() {
         INSERT INTO student_assignments
           (id, student_id, class_id, batch_id, assignment_scope_key,
            effective_from, effective_to)
-        VALUES (31, 8, 3, NULL, 'class:3', 300, NULL)
+        VALUES (31, 8, 3, NULL, 'class:3', 220, NULL)
       ''', const []),
       throwsA(isA<Exception>()),
     );
@@ -492,7 +498,7 @@ void main() {
     await expectLater(
       executor.runCustom('''
         UPDATE student_assignments
-        SET effective_from = 150
+        SET effective_from = 350
         WHERE id = 29
       ''', const []),
       throwsA(isA<Exception>()),
