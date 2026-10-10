@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:edumanage_offline/core/database/app_database.dart';
 import 'package:edumanage_offline/core/database/student_assignments_dao.dart';
@@ -85,6 +86,42 @@ void main() {
         classId: classA,
         batchId: batchB,
         effectiveFrom: DateTime(2026, 1, 1),
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('database rejects assignment with a missing student foreign key',
+      () async {
+    final classId = await createClass('Class A');
+
+    await expectLater(
+      database.into(database.studentAssignments).insert(
+            StudentAssignmentsCompanion.insert(
+              studentId: 999999,
+              classId: classId,
+              batchId: const Value(null),
+              assignmentScopeKey: 'class:$classId',
+              effectiveFrom: DateTime(2026, 1, 1),
+              effectiveTo: const Value(null),
+              changeReason: const Value(null),
+              createdAt: Value(DateTime(2026, 1, 1)),
+            ),
+          ),
+      throwsA(anything),
+    );
+  });
+
+  test('rejects non-positive assignment interval length', () async {
+    final studentId = await createStudent();
+    final classId = await createClass('Class A');
+
+    expect(
+      () => assignmentsDao.assign(
+        studentId: studentId,
+        classId: classId,
+        effectiveFrom: DateTime(2026, 2, 1),
+        effectiveTo: DateTime(2026, 2, 1),
       ),
       throwsArgumentError,
     );
