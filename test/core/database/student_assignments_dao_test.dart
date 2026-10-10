@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:edumanage_offline/core/database/app_database.dart';
 import 'package:edumanage_offline/core/database/student_assignments_dao.dart';
