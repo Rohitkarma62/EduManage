@@ -332,6 +332,66 @@ void main() {
     expect(newTriggers, isEmpty);
   });
 
+  test('rolls back v3-to-v4 date-range trigger creation atomically', () async {
+    final executor = NativeDatabase.memory(
+      setup: (database) {
+        database.execute('''
+          CREATE TABLE student_assignments (
+            id INTEGER PRIMARY KEY,
+            effective_from INTEGER NOT NULL,
+            effective_to INTEGER
+          )
+        ''');
+        database.execute('''
+          INSERT INTO student_assignments (id, effective_from, effective_to)
+          VALUES (51, 100, 200)
+        ''');
+        // Force the second v4 trigger creation to fail after the insert trigger
+        // has been created. The migration transaction must remove that insert
+        // trigger and preserve the pre-existing conflicting trigger.
+        database.execute('''
+          CREATE TRIGGER student_assignments_valid_range_update
+          BEFORE UPDATE ON student_assignments
+          BEGIN
+            SELECT RAISE(ABORT, 'fixture migration failure');
+          END
+        ''');
+        database.execute('PRAGMA user_version = 3');
+      },
+    );
+
+    final database = AppDatabase.forTesting(executor);
+    addTearDown(database.close);
+
+    await expectLater(
+      database.customSelect('SELECT 1').getSingle(),
+      throwsA(isA<Exception>()),
+    );
+
+    final versionRows = await executor.runSelect('PRAGMA user_version', const []);
+    expect(versionRows.single['user_version'], 3);
+
+    final assignmentRows = await executor.runSelect(
+      'SELECT id, effective_from, effective_to FROM student_assignments WHERE id = ?',
+      [51],
+    );
+    expect(assignmentRows.single['id'], 51);
+    expect(assignmentRows.single['effective_from'], 100);
+    expect(assignmentRows.single['effective_to'], 200);
+
+    final triggerRows = await executor.runSelect(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger'",
+      const [],
+    );
+    final triggerSql = {
+      for (final row in triggerRows)
+        row['name'] as String: row['sql'] as String,
+    };
+    expect(triggerSql.keys, contains('student_assignments_valid_range_update'));
+    expect(triggerSql['student_assignments_valid_range_update'], contains('fixture migration failure'));
+    expect(triggerSql.keys, isNot(contains('student_assignments_valid_range_insert')));
+  });
+
   test('rolls back a failed v1 migration and preserves schema version', () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
