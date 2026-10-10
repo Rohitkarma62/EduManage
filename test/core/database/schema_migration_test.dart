@@ -290,6 +290,48 @@ void main() {
   });
 
 
+  test('refuses v3 migration when legacy assignment ranges are invalid', () async {
+    final executor = NativeDatabase.memory(
+      setup: (database) {
+        database.execute('''
+          CREATE TABLE student_assignments (
+            id INTEGER PRIMARY KEY,
+            effective_from INTEGER NOT NULL,
+            effective_to INTEGER
+          )
+        ''');
+        database.execute('''
+          INSERT INTO student_assignments (id, effective_from, effective_to)
+          VALUES (41, 200, 200)
+        ''');
+        database.execute('PRAGMA user_version = 3');
+      },
+    );
+
+    final database = AppDatabase.forTesting(executor);
+    addTearDown(database.close);
+
+    await expectLater(
+      database.customSelect('SELECT 1').getSingle(),
+      throwsA(isA<StateError>()),
+    );
+
+    final versionRows = await executor.runSelect('PRAGMA user_version', const []);
+    expect(versionRows.single['user_version'], 3);
+    final legacyRows = await executor.runSelect(
+      'SELECT id, effective_from, effective_to FROM student_assignments WHERE id = ?',
+      [41],
+    );
+    expect(legacyRows.single['id'], 41);
+    expect(legacyRows.single['effective_from'], 200);
+    expect(legacyRows.single['effective_to'], 200);
+    final newTriggers = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'student_assignments_valid_range_%'",
+      const [],
+    );
+    expect(newTriggers, isEmpty);
+  });
+
   test('rolls back a failed v1 migration and preserves schema version', () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
