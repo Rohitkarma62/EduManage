@@ -266,4 +266,64 @@ void main() {
     );
   });
 
+
+  test('rolls back a failed v1 migration and preserves schema version', () async {
+    final executor = NativeDatabase.memory(
+      setup: (database) {
+        database.execute('CREATE TABLE batches (id INTEGER PRIMARY KEY, class_id INTEGER)');
+        database.execute('''
+          CREATE TABLE student_assignments (
+            id INTEGER PRIMARY KEY,
+            student_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            batch_id INTEGER,
+            assignment_scope_key TEXT NOT NULL,
+            effective_from INTEGER NOT NULL,
+            effective_to INTEGER
+          )
+        ''');
+        database.execute('''
+          INSERT INTO student_assignments
+            (id, student_id, class_id, batch_id, assignment_scope_key,
+             effective_from, effective_to)
+          VALUES (9, 4, 2, NULL, 'class:2', 100, NULL)
+        ''');
+        // Force failure after the first v2 trigger has been created.
+        database.execute('''
+          CREATE TRIGGER student_assignments_batch_class_update
+          BEFORE UPDATE ON student_assignments
+          BEGIN
+            SELECT RAISE(ABORT, 'fixture migration failure');
+          END
+        ''');
+        database.execute('PRAGMA user_version = 1');
+      },
+    );
+
+    final database = AppDatabase.forTesting(executor);
+    addTearDown(database.close);
+
+    await expectLater(
+      database.customSelect('SELECT 1').getSingle(),
+      throwsA(isA<Exception>()),
+    );
+
+    // Query the executor directly because Drift's open future has failed.
+    final versionRows = await executor.runSelect('PRAGMA user_version', const []);
+    expect(versionRows.single['user_version'], 1);
+
+    final assignmentRows = await executor.runSelect(
+      'SELECT id, assignment_scope_key FROM student_assignments WHERE id = ?',
+      [9],
+    );
+    expect(assignmentRows.single['id'], 9);
+    expect(assignmentRows.single['assignment_scope_key'], 'class:2');
+
+    final triggerRows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?",
+      ['student_assignments_batch_class_insert'],
+    );
+    expect(triggerRows, isEmpty);
+  });
+
 }
