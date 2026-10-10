@@ -1,6 +1,6 @@
 # Phase 3: Database Foundation
 
-**Status:** Initial local database foundation implemented. SQLite-level assignment integrity triggers and a schema-version-2 upgrade path are now included. The newest changes require a fresh CI run before they can be called verified. This is not product-complete or release-ready.
+**Status:** Initial local database foundation implemented. SQLite-level assignment integrity triggers and a schema-version-2 upgrade path are included. CI run #13 passed the migration test, analysis, and Flutter test suite. Follow-up migration compatibility checks are now being strengthened; this is not product-complete or release-ready.
 
 ## Scope of this first slice
 
@@ -27,7 +27,7 @@
 - Schema version 1 was the initial development schema. Version 2 adds integrity triggers.
 - onUpgrade installs the new triggers for existing version-1 databases; it does not drop or recreate user tables.
 - Keep every future schema change behind an incremented schemaVersion and an explicit onUpgrade path. Never change an already-shipped schema in place without a migration.
-- Before schema version 3, add a committed schema export and Drift migration-verifier test (including data preservation across an upgrade). The current in-memory tests validate behavior but do not yet simulate a real version-1-to-version-2 database upgrade.
+- A real in-memory SQLite v1 fixture now exercises Drift's v1-to-v2 upgrade path, preserves seeded institute/student/class/batch/assignment records, checks that the six v1 indexes remain, verifies the four v2 triggers, and tests that overlap enforcement still works after migration. The fixture's frozen DDL must be kept aligned with the historical v1 schema when that schema changes.
 - CI runs Drift code generation, flutter analyze, and flutter test. No Gradle task, APK build, or device-level test is authorized or claimed.
 - SQLite WAL mode is enabled for the app connection. Backup/restore consistency and device-level migration behavior remain unverified.
 
@@ -37,8 +37,8 @@ Money, fee ledgers, opening balances, payments, refunds, salary, discounts/credi
 
 ## Review gates before merge
 
-1. Fresh CI must pass on the latest Phase 3 commit.
-2. Review the version-1-to-version-2 upgrade behavior and add a migration-verifier/data-preservation test.
-3. Commit a schema export before the next schema-version change.
+1. Fresh CI must pass on the latest Phase 3 commit, including migration, analysis, and all tests.
+2. Review the frozen v1 fixture against the actual historical v1 DDL; it is manually maintained and can drift if not reviewed carefully.
+3. Commit a canonical schema export before the next schema-version change.
 4. Re-review the first schema against the approved product specification before adding financial tables.
 5. PR #2 remains draft and must not be merged as part of this work. CI success alone is not product readiness.
