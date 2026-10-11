@@ -120,17 +120,32 @@ class AttendanceDao {
         );
       }
     }
-    final changed = await (_db.update(_db.attendanceEntries)
-          ..where((row) =>
-              row.sessionId.equals(sessionId) & row.studentId.equals(studentId)))
-        .write(AttendanceEntriesCompanion(
-      status: Value(status.name),
-      correctionReason: Value(normalizedReason),
-      updatedAt: Value(DateTime.now()),
-    ));
-    if (changed != 1) {
-      throw ArgumentError.value(studentId, 'studentId', 'Attendance entry not found.');
-    }
+    await _db.transaction(() async {
+      final entry = await (_db.select(_db.attendanceEntries)
+            ..where((row) =>
+                row.sessionId.equals(sessionId) & row.studentId.equals(studentId)))
+          .getSingleOrNull();
+      if (entry == null) {
+        throw ArgumentError.value(studentId, 'studentId', 'Attendance entry not found.');
+      }
+      if (session.isFinalized && entry.status != status.name) {
+        await _db.into(_db.attendanceCorrections).insert(
+              AttendanceCorrectionsCompanion.insert(
+                entryId: entry.id,
+                previousStatus: entry.status,
+                newStatus: status.name,
+                reason: normalizedReason!,
+              ),
+            );
+      }
+      await (_db.update(_db.attendanceEntries)
+            ..where((row) => row.id.equals(entry.id)))
+          .write(AttendanceEntriesCompanion(
+        status: Value(status.name),
+        correctionReason: Value(normalizedReason),
+        updatedAt: Value(DateTime.now()),
+      ));
+    });
   }
 
   Future<void> finalizeSession({
