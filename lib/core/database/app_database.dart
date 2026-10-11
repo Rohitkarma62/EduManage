@@ -15,6 +15,8 @@ part 'app_database.g.dart';
   ClassGroups,
   Batches,
   StudentAssignments,
+  AttendanceSessions,
+  AttendanceEntries,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -22,7 +24,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -31,6 +33,7 @@ class AppDatabase extends _$AppDatabase {
           await _createIntegrityTriggers();
           await _createAssignmentScopeTriggers();
           await _createAssignmentDateRangeTriggers();
+          await _createAttendanceScopeTriggers();
         },
         onUpgrade: (m, from, to) async {
           // Keep all trigger DDL in one transaction. If any statement fails,
@@ -45,6 +48,11 @@ class AppDatabase extends _$AppDatabase {
             if (from < 4) {
               await _validateExistingAssignmentDateRanges();
               await _createAssignmentDateRangeTriggers();
+            }
+            if (from < 5) {
+              await m.createTable(attendanceSessions);
+              await m.createTable(attendanceEntries);
+              await _createAttendanceScopeTriggers();
             }
           });
         },
@@ -197,3 +205,52 @@ LazyDatabase _openConnection() {
     );
   });
 }
+
+
+  Future<void> _createAttendanceScopeTriggers() async {
+    await customStatement('''
+      CREATE TRIGGER attendance_sessions_scope_insert
+      BEFORE INSERT ON attendance_sessions
+      WHEN NEW.attendance_scope_key != CASE
+        WHEN NEW.batch_id IS NULL THEN 'class:' || NEW.class_id
+        ELSE 'batch:' || NEW.batch_id
+      END
+      BEGIN
+        SELECT RAISE(ABORT, 'attendance session scope key mismatch');
+      END
+    ''');
+    await customStatement('''
+      CREATE TRIGGER attendance_sessions_scope_update
+      BEFORE UPDATE OF class_id, batch_id, attendance_scope_key
+      ON attendance_sessions
+      WHEN NEW.attendance_scope_key != CASE
+        WHEN NEW.batch_id IS NULL THEN 'class:' || NEW.class_id
+        ELSE 'batch:' || NEW.batch_id
+      END
+      BEGIN
+        SELECT RAISE(ABORT, 'attendance session scope key mismatch');
+      END
+    ''');
+    await customStatement('''
+      CREATE TRIGGER attendance_sessions_batch_class_insert
+      BEFORE INSERT ON attendance_sessions
+      WHEN NEW.batch_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM batches
+        WHERE id = NEW.batch_id AND class_id = NEW.class_id
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'attendance session batch/class mismatch');
+      END
+    ''');
+    await customStatement('''
+      CREATE TRIGGER attendance_sessions_batch_class_update
+      BEFORE UPDATE OF batch_id, class_id ON attendance_sessions
+      WHEN NEW.batch_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM batches
+        WHERE id = NEW.batch_id AND class_id = NEW.class_id
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'attendance session batch/class mismatch');
+      END
+    ''');
+  }
