@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "README.md"
+      - ".gitignore"
       - "pubspec.yaml"
       - "pubspec.lock"
       - ".fvmrc"
