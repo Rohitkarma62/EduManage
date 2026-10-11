@@ -15,6 +15,9 @@ part 'app_database.g.dart';
   ClassGroups,
   Batches,
   StudentAssignments,
+  AttendanceSessions,
+  AttendanceEntries,
+  AttendanceCorrections,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -22,7 +25,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -31,6 +34,7 @@ class AppDatabase extends _$AppDatabase {
           await _createIntegrityTriggers();
           await _createAssignmentScopeTriggers();
           await _createAssignmentDateRangeTriggers();
+          await _createAttendanceScopeTriggers();
         },
         onUpgrade: (m, from, to) async {
           // Keep all trigger DDL in one transaction. If any statement fails,
@@ -45,6 +49,33 @@ class AppDatabase extends _$AppDatabase {
             if (from < 4) {
               await _validateExistingAssignmentDateRanges();
               await _createAssignmentDateRangeTriggers();
+            }
+            if (from < 5) {
+              await m.createTable(attendanceSessions);
+              await m.createTable(attendanceEntries);
+              // Drift's createTable migration helper does not create declared
+              // indexes for an individual table. Add them explicitly so
+              // upgraded databases match the fresh-install schema.
+              await customStatement('''
+                CREATE UNIQUE INDEX attendance_sessions_scope_date_unique
+                ON attendance_sessions (attendance_scope_key, attendance_date)
+              ''');
+              await customStatement('''
+                CREATE UNIQUE INDEX attendance_entries_session_student_unique
+                ON attendance_entries (session_id, student_id)
+              ''');
+              await customStatement('''
+                CREATE INDEX attendance_entries_student_idx
+                ON attendance_entries (student_id)
+              ''');
+              await _createAttendanceScopeTriggers();
+            }
+            if (from < 6) {
+              await m.createTable(attendanceCorrections);
+              await customStatement('''
+                CREATE INDEX attendance_corrections_entry_time_idx
+                ON attendance_corrections (entry_id, corrected_at)
+              ''');
             }
           });
         },
@@ -179,6 +210,54 @@ class AppDatabase extends _$AppDatabase {
       END
       BEGIN
         SELECT RAISE(ABORT, 'student assignment scope key mismatch');
+      END
+    ''');
+  }
+
+  Future<void> _createAttendanceScopeTriggers() async {
+    await customStatement('''
+      CREATE TRIGGER attendance_sessions_scope_insert
+      BEFORE INSERT ON attendance_sessions
+      WHEN NEW.attendance_scope_key != CASE
+        WHEN NEW.batch_id IS NULL THEN 'class:' || NEW.class_id
+        ELSE 'batch:' || NEW.batch_id
+      END
+      BEGIN
+        SELECT RAISE(ABORT, 'attendance session scope key mismatch');
+      END
+    ''');
+    await customStatement('''
+      CREATE TRIGGER attendance_sessions_scope_update
+      BEFORE UPDATE OF class_id, batch_id, attendance_scope_key
+      ON attendance_sessions
+      WHEN NEW.attendance_scope_key != CASE
+        WHEN NEW.batch_id IS NULL THEN 'class:' || NEW.class_id
+        ELSE 'batch:' || NEW.batch_id
+      END
+      BEGIN
+        SELECT RAISE(ABORT, 'attendance session scope key mismatch');
+      END
+    ''');
+    await customStatement('''
+      CREATE TRIGGER attendance_sessions_batch_class_insert
+      BEFORE INSERT ON attendance_sessions
+      WHEN NEW.batch_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM batches
+        WHERE id = NEW.batch_id AND class_id = NEW.class_id
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'attendance session batch/class mismatch');
+      END
+    ''');
+    await customStatement('''
+      CREATE TRIGGER attendance_sessions_batch_class_update
+      BEFORE UPDATE OF batch_id, class_id ON attendance_sessions
+      WHEN NEW.batch_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM batches
+        WHERE id = NEW.batch_id AND class_id = NEW.class_id
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'attendance session batch/class mismatch');
       END
     ''');
   }

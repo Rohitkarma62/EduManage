@@ -79,3 +79,58 @@ class StudentAssignments extends Table {
   TextColumn get changeReason => text().nullable().withLength(max: 500)();
   DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
 }
+
+
+@TableIndex(
+  name: 'attendance_sessions_scope_date_unique',
+  columns: {#attendanceScopeKey, #attendanceDate},
+  unique: true,
+)
+class AttendanceSessions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get classId =>
+      integer().references(ClassGroups, #id, onDelete: KeyAction.restrict)();
+  IntColumn get batchId =>
+      integer().nullable().references(Batches, #id, onDelete: KeyAction.restrict)();
+  TextColumn get attendanceScopeKey => text().withLength(min: 1, max: 80)();
+  DateTimeColumn get attendanceDate => dateTime()();
+  BoolColumn get isFinalized => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
+}
+
+@TableIndex(
+  name: 'attendance_entries_session_student_unique',
+  columns: {#sessionId, #studentId},
+  unique: true,
+)
+@TableIndex(
+  name: 'attendance_entries_student_idx',
+  columns: {#studentId},
+)
+class AttendanceEntries extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get sessionId => integer()
+      .references(AttendanceSessions, #id, onDelete: KeyAction.restrict)();
+  IntColumn get studentId =>
+      integer().references(Students, #id, onDelete: KeyAction.restrict)();
+  TextColumn get status => text().withLength(min: 1, max: 16)();
+  TextColumn get correctionReason => text().nullable().withLength(max: 500)();
+  DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
+}
+
+
+@TableIndex(
+  name: 'attendance_corrections_entry_time_idx',
+  columns: {#entryId, #correctedAt},
+)
+class AttendanceCorrections extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get entryId => integer()
+      .references(AttendanceEntries, #id, onDelete: KeyAction.restrict)();
+  TextColumn get previousStatus => text().withLength(min: 1, max: 16)();
+  TextColumn get newStatus => text().withLength(min: 1, max: 16)();
+  TextColumn get reason => text().withLength(min: 1, max: 500)();
+  DateTimeColumn get correctedAt => dateTime().clientDefault(DateTime.now)();
+}
