@@ -5,12 +5,16 @@ on:
     branches: [phase-2/flutter-bootstrap]
     types: [opened, synchronize, reopened]
     paths:
+      - "README.md"
       - "pubspec.yaml"
       - "pubspec.lock"
       - ".fvmrc"
       - "lib/core/database/**"
       - "test/core/database/**"
       - "docs/PHASE_3_DATABASE_FOUNDATION.md"
+      - "docs/PHASE_2_BOOTSTRAP.md"
+      - "docs/RECONCILIATION.md"
+      - "docs/decision_log.md"
       - ".github/workflows/phase-3-database.yml"
   workflow_dispatch:
 
