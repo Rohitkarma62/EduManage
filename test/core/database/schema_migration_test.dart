@@ -2,11 +2,13 @@ import 'package:drift/native.dart';
 import 'package:edumanage_offline/core/database/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Frozen v1 DDL for the schema that existed before v2/v3/v4 integrity triggers.
-/// Keep table columns, constraints, and indexes aligned with the v1 schema;
-/// v2 adds four integrity triggers; v3 adds two assignment-scope triggers; v4 adds two date-range triggers.
+/// Frozen v1 DDL for the schema that existed before later migrations.
+/// Keep table columns, constraints, and indexes aligned with v1; v2 adds four
+/// integrity triggers, v3 adds assignment-scope triggers, v4 adds date-range
+/// triggers, v5 adds attendance tables and scope triggers, and v6 adds the
+/// attendance correction audit table.
 void main() {
-  test('upgrades populated v1 schema to v4 and preserves schema and data',
+  test('upgrades populated v1 schema to v6 and preserves schema and data',
       () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
@@ -133,13 +135,23 @@ void main() {
     final database = AppDatabase.forTesting(executor);
     addTearDown(database.close);
 
-    // Accessing the database runs Drift's actual v1 -> v4 migration.
+    // Accessing the database runs Drift's actual v1 -> v6 migration.
     await database.customSelect('SELECT 1').getSingle();
 
     final version = await database
         .customSelect('PRAGMA user_version', readsFrom: const {})
         .getSingle();
-    expect(version.read<int>('user_version'), 4);
+    expect(version.read<int>('user_version'), 6);
+
+    final migratedTables = await database.customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
+      "('attendance_sessions', 'attendance_entries', 'attendance_corrections')",
+      readsFrom: const {},
+    ).get();
+    expect(
+      migratedTables.map((row) => row.read<String>('name')).toSet(),
+      {'attendance_sessions', 'attendance_entries', 'attendance_corrections'},
+    );
 
     final expectedIndexes = {
       'students_name_idx',
@@ -148,6 +160,10 @@ void main() {
       'batches_class_name_unique',
       'student_assignments_student_start_idx',
       'student_assignments_scope_start_idx',
+      'attendance_sessions_scope_date_unique',
+      'attendance_entries_session_student_unique',
+      'attendance_entries_student_idx',
+      'attendance_corrections_entry_time_idx',
     };
     final indexes = await database.customSelect(
       "SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%'",
@@ -215,7 +231,11 @@ void main() {
       "'student_assignments_scope_key_insert', "
       "'student_assignments_scope_key_update', "
       "'student_assignments_valid_range_insert', "
-      "'student_assignments_valid_range_update')",
+      "'student_assignments_valid_range_update', "
+      "'attendance_sessions_scope_insert', "
+      "'attendance_sessions_scope_update', "
+      "'attendance_sessions_batch_class_insert', "
+      "'attendance_sessions_batch_class_update')",
       readsFrom: const {},
     ).get();
     expect(triggers.map((row) => row.read<String>('name')).toSet(), {
@@ -227,6 +247,10 @@ void main() {
       'student_assignments_scope_key_update',
       'student_assignments_valid_range_insert',
       'student_assignments_valid_range_update',
+      'attendance_sessions_scope_insert',
+      'attendance_sessions_scope_update',
+      'attendance_sessions_batch_class_insert',
+      'attendance_sessions_batch_class_update',
     });
 
     // Seed a second student so the date-range assertion cannot be satisfied
