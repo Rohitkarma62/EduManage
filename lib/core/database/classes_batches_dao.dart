@@ -14,12 +14,13 @@ class ClassesBatchesDao {
     String? description,
   }) {
     final normalizedName = _requiredName(name, 'name');
+    final now = DateTime.now();
     return _db.into(_db.classGroups).insert(
           ClassGroupsCompanion.insert(
             name: normalizedName,
             description: Value(_normalizeOptional(description)),
-            createdAt: Value(DateTime.now()),
-            updatedAt: Value(DateTime.now()),
+            createdAt: Value(now),
+            updatedAt: Value(now),
           ),
         );
   }
@@ -66,18 +67,19 @@ class ClassesBatchesDao {
       throw StateError('Cannot add a batch to an archived class.');
     }
 
+    final now = DateTime.now();
     return _db.into(_db.batches).insert(
           BatchesCompanion.insert(
             classId: classId,
             name: normalizedName,
             description: Value(_normalizeOptional(description)),
-            createdAt: Value(DateTime.now()),
-            updatedAt: Value(DateTime.now()),
+            createdAt: Value(now),
+            updatedAt: Value(now),
           ),
         );
   }
 
-  Future<List<Batch>> listActiveBatches({required int classId}) {
+  Future<List<Batche>> listActiveBatches({required int classId}) {
     return (_db.select(_db.batches)
           ..where((row) =>
               row.classId.equals(classId) & row.isActive.equals(true))
@@ -88,7 +90,7 @@ class ClassesBatchesDao {
         .get();
   }
 
-  Future<Batch?> findBatchById(int id) {
+  Future<Batche?> findBatchById(int id) {
     return (_db.select(_db.batches)..where((row) => row.id.equals(id)))
         .getSingleOrNull();
   }
