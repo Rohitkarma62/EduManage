@@ -38,8 +38,8 @@ void main() {
   test('rejects blank class or batch names without inserting records', () async {
     expect(() => dao.createClass(name: '   '), throwsArgumentError);
     final classId = await dao.createClass(name: 'Class A');
-    expect(
-      () => dao.createBatch(classId: classId, name: '  '),
+    await expectLater(
+      dao.createBatch(classId: classId, name: '  '),
       throwsArgumentError,
     );
     expect(await dao.listActiveClasses(), hasLength(1));
