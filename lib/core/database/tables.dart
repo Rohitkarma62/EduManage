@@ -119,3 +119,18 @@ class AttendanceEntries extends Table {
   DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
   DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
 }
+
+
+@TableIndex(
+  name: 'attendance_corrections_entry_time_idx',
+  columns: {#entryId, #correctedAt},
+)
+class AttendanceCorrections extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get entryId => integer()
+      .references(AttendanceEntries, #id, onDelete: KeyAction.restrict)();
+  TextColumn get previousStatus => text().withLength(min: 1, max: 16)();
+  TextColumn get newStatus => text().withLength(min: 1, max: 16)();
+  TextColumn get reason => text().withLength(min: 1, max: 500)();
+  DateTimeColumn get correctedAt => dateTime().clientDefault(DateTime.now)();
+}
