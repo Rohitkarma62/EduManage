@@ -2,7 +2,7 @@ name: Phase 3 Database Foundation
 
 on:
   pull_request:
-    branches: [phase-2/flutter-bootstrap]
+    branches: [phase-2/flutter-bootstrap, phase-3/database-foundation]
     types: [opened, synchronize, reopened]
     paths:
       - "README.md"
@@ -74,4 +74,4 @@ jobs:
             exit 0
           fi
           git commit -m "build(db): generate Drift database code"
-          git push origin HEAD:phase-3/database-foundation
+          git push origin "HEAD:${{ github.event.pull_request.head.ref || 'phase-3/database-foundation' }}"
