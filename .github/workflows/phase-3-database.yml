@@ -2,15 +2,20 @@ name: Phase 3 Database Foundation
 
 on:
   pull_request:
-    branches: [phase-2/flutter-bootstrap]
+    branches: [phase-2/flutter-bootstrap, phase-3/database-foundation]
     types: [opened, synchronize, reopened]
     paths:
+      - "README.md"
+      - ".gitignore"
       - "pubspec.yaml"
       - "pubspec.lock"
       - ".fvmrc"
       - "lib/core/database/**"
       - "test/core/database/**"
       - "docs/PHASE_3_DATABASE_FOUNDATION.md"
+      - "docs/PHASE_2_BOOTSTRAP.md"
+      - "docs/RECONCILIATION.md"
+      - "docs/decision_log.md"
       - ".github/workflows/phase-3-database.yml"
   workflow_dispatch:
 
@@ -49,7 +54,7 @@ jobs:
         run: flutter pub get
 
       - name: Generate Drift code
-        run: dart run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build
 
       - name: Analyze Dart and Flutter sources
         run: flutter analyze
@@ -69,4 +74,4 @@ jobs:
             exit 0
           fi
           git commit -m "build(db): generate Drift database code"
-          git push origin HEAD:phase-3/database-foundation
+          git push origin "HEAD:${{ github.event.pull_request.head.ref || 'phase-3/database-foundation' }}"
