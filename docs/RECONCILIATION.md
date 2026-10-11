@@ -1,103 +1,85 @@
-# Filesystem Reconciliation Report
+# EduManage Offline — Reconciliation and Remaining Work
 
 - Repository: `Rohitkarma62/EduManage`
-- Target branch: `main`
-- Baseline scaffold commit: `6b21cc79b99e9f240f6023cde3d3722c6d887cb2`
-- Specification reviewed: `EduManage_Offline_Full_Developer_Reconstruction_Specification.pdf`, version 1.0, planning baseline 2026-10-09
-- Review type: filesystem and architecture-plan reconciliation only
-- Build/tests: not run
-- Application source implementation: not present at this review point
+- Current working branch: `phase-3/database-foundation`
+- Related pull requests: [Phase 2 bootstrap #1](https://github.com/Rohitkarma62/EduManage/pull/1), [Phase 3 database foundation #2](https://github.com/Rohitkarma62/EduManage/pull/2)
+- Scope: compare current tracked implementation with the intended offline-first product requirements.
+- Build policy: no APK or Gradle build was run as part of this review.
+- Merge policy: neither pull request is merged by this work.
 
 ## Executive summary
 
-The scaffold broadly matches the proposed feature boundaries and layered architecture in Section 3 of the specification. It is a useful directory map, but it is not a Flutter project yet. The specification explicitly describes its filesystem as a proposed target, not proof of implementation.
+The repository is no longer just an empty scaffold: it contains a Flutter bootstrap, a generated Android platform scaffold, a dependency lockfile, an app shell, and a tested Drift/SQLite database foundation for institute settings, students, classes, batches and effective-dated student assignments.
 
-No business rule, database schema, migration, PDF workflow, license verifier, or backup/restore behavior was implemented as part of this reconciliation. The goal is to make the repository plan honest, coherent, and safer for the next implementation phase.
+It is still **not a complete school/coaching management product and is not release-ready**. The implemented screen is a bootstrap shell. Most feature folders remain placeholders. The current green CI covers dependency resolution, Drift code generation, static analysis and automated tests, not a release APK or physical-device behavior.
 
-## Findings and decisions
+## Verified implementation
 
-### R-01 — Project bootstrap files are intentionally absent
-**Severity: Blocker for compilation, not a scaffold defect.**
+- Flutter toolchain pinned to 3.47.5 stable; Dart is supplied by that Flutter SDK.
+- Riverpod, GoRouter, Drift, local file/PDF dependencies and `pubspec.lock` are present.
+- Flutter app shell uses the locked palette tokens.
+- SQLite is stored in app-private application-support storage; foreign keys and WAL are enabled.
+- Drift schema v4 includes institute settings, students, class groups, batches and student assignments.
+- Student DAO supports create, lookup, active-list pagination, contact update and soft deactivation.
+- Assignment DAO validates references, positive effective intervals and overlap; SQLite triggers protect core integrity even for direct SQL writes.
+- Migration tests exercise v1-to-v4 migration, preservation of seeded data, integrity-trigger installation and rollback when v1, v2 or v3 upgrades fail.
+- Latest recorded successful workflow: [Run #50](https://github.com/Rohitkarma62/EduManage/actions/runs/38107462863). It completed pinned Flutter setup, dependency resolution, Drift generation, `flutter analyze`, `flutter test` and the generated-file step.
+- Documentation changes made after Run #50 are not independently verified until a workflow runs against the newer commit.
 
-Missing: `pubspec.yaml`, `pubspec.lock`, `analysis_options.yaml`, `lib/main.dart`, app widget, Flutter platform scaffold and generated Drift output.
+## Open product decisions — preserve P-01 through P-07
 
-Decision: do not hand-author a fake lockfile or guess dependency versions. When implementation is authorized, use a pinned Flutter/Dart toolchain, generate the standard Android project files with Flutter tooling, add dependencies, run dependency resolution, and commit the resulting lockfile. This scaffold must not be described as buildable.
+Do not infer business decisions from code or freeze production schema until the relevant decisions are approved and backed by evidence.
 
-### R-02 — Runtime storage must not be confused with repository directories
-**Severity: High, data-safety boundary.**
+- **P-01:** opening-balance provenance and ambiguous legacy balance handling.
+- **P-02:** refund lifecycle/cancellation stages.
+- **P-03:** exact PDF-byte retention by document type.
+- **P-04:** salary accounting correction versus actual cash recovery.
+- **P-05:** published-result correction and certificate review/reissue.
+- **P-06:** restore journal and audit survival architecture.
+- **P-07:** operation-level license entitlement matrix.
 
-SQLite database, private managed files, temporary files, backups, license imports and generated customer documents belong in app-private runtime storage, not in source-controlled folders. The repository contains only code, assets intended for bundling, tests, and documentation. The actual runtime directory paths are platform-specific and must be implemented and tested, not assumed from this folder tree.
+Details and required evidence are in [decision_log.md](decision_log.md). Existing SC-01–SC-10, CC-01–CC-16 and B-01–B-20 identifiers and meanings must be preserved; unresolved requirements must not be marked complete without source/test evidence or authorized approval.
 
-### R-03 — Android directories are not a generated Android project
-**Severity: High, build-readiness clarity.**
+## Remaining implementation work
 
-The current `android/app/src/main` and `android/app/src/test` paths are placeholders only. They do not contain Gradle wrapper/configuration, manifest, Kotlin activity, signing configuration, or a complete Flutter Android runner. Prefer generating the platform project using Flutter tooling when bootstrapping, rather than gradually hand-constructing platform files.
+### Product modules
+- Student/class/batch UI and repository integration beyond the current database DAO slice.
+- Staff and staff assignment workflows.
+- Fee plans/ledger, opening balances, payments, receipt numbering, partial payments, oldest-outstanding allocation, credits/discounts, refunds/reversals and expense/salary accounting.
+- Attendance with explicit Unmarked state, atomic saves, duplicate prevention and audited corrections.
+- Exams, draft mark states, immutable/versioned published results and linked certificates.
+- Offline PDF generation with approved snapshots, retention and reissue rules.
+- Managed-file ownership, integrity and retention.
+- Backup/restore with consistent SQLite/WAL snapshot, manifest/checksums, staging, validation, safety backup, durable recovery journal and rollback.
+- Signed offline licensing, invalid-import safety, non-expiring license handling, operation-level entitlements and downgrade-safe read-only behavior.
+- The agreed screen set and navigation. The product target has 45 active screens; SCR-19 is retired and merged into SCR-42.
 
-### R-04 — Feature layering is a convention, not an obligation to create empty files everywhere
-**Severity: Medium, maintainability.**
+### Engineering/release work
+- Review the full Phase 2 base/integration state and reconcile PR #1's stale description with actual CI evidence.
+- Add canonical schema export and migration evidence before the next schema-version change; this is not a claim that the current schema is production-frozen.
+- Run CI after the newest documentation/workflow changes and record the exact tested commit.
+- Review generated placeholder Android application ID `com.example.edumanage_offline`; do not guess a final application ID without an approved product identity.
+- Configure release signing through protected secrets/keystore handling; never commit private signing keys or passwords.
+- Add unit, database, migration, workflow, PDF, backup/restore, licensing, and UI tests for each implemented module.
+- Perform offline-device and restore interruption tests before release.
+- Run the final APK/release build only when the build phase is authorized.
 
-Feature folders use `presentation/`, `domain/`, and `data/` as architectural boundaries. Use all three where the feature warrants them. Simple presentation-only features need not contain artificial empty layers. Keep domain rules independent of Flutter widgets; keep persistence behind repositories/DAOs; avoid duplicate calculations in screens.
+## Data-safety and architecture constraints
 
-### R-05 — Core subfolders should be implementation-oriented and explicit
-**Severity: Medium.**
+- All core workflows must work offline and store operational data locally.
+- Money must be stored as integer paise.
+- Invalid license import must not replace a valid license or damage data.
+- Downgrade must preserve data; gated features may become read-only.
+- Student assignments use half-open effective intervals `[effective_from, effective_to)`; adjacent intervals are allowed, overlapping intervals are not.
+- Leave is excluded from the attendance denominator; Present / (Present + Absent) is used, with explicit states for zero denominator and missing records.
+- Published results and historical financial corrections require audit/version history.
+- Restore must be recoverable across process termination and must not depend on the database being replaced to retain its own recovery journal.
+- The locked visual design must not be changed without explicit authorization.
 
-The specification calls for named components including:
-- Database: `app_database.dart`, schema version, tables, DAOs, migrations and seeds.
-- Files: managed file service, owner reference, manifest, integrity and retention policy.
-- PDF: service, document snapshots and local templates.
-- Backup: service, manifest, verifier, restore service and durable restore journal.
-- Licensing: payload, signature verifier, entitlement service and import service.
-- Security: secret redaction.
+## Final disposition
 
-These are target responsibilities only. Do not add empty Dart source files with fake APIs merely to make the tree look complete. Add each source file with its implementation and tests in the relevant feature phase.
-
-### R-06 — Required governance/evidence documents need explicit tracking
-**Severity: High for safe handoff.**
-
-The specification expects decision tracking and migration evidence. Add a decision log template and a migration-evidence README describing what evidence belongs there. Do not fabricate approvals, migration test results, or implementation evidence.
-
-### R-07 — Data, build, and signing secrets must stay out of Git
-**Severity: Critical security rule.**
-
-Never commit private license-signing keys, Android release keystores/passwords, real student/staff data, production backups, access tokens, or secrets in logs. Public license verification material may be bundled only after the signing format/key management is approved. Add ignore rules when the actual Flutter bootstrap is created; verify that ignore patterns do not hide required source or generated files.
-
-### R-08 — Offline-first and visual design constraints remain acceptance criteria
-**Severity: High product requirement.**
-
-Core CRUD, finance, attendance, local PDF generation and backup/restore must not depend on network calls. Keep the locked reference design tokens (navy `#17324D`, teal `#0F766E`, canvas `#F5F7FA`, white surfaces and the supplied screen hierarchy) unchanged. Exact visual parity still requires the original per-screen assets/measurements and device validation. A folder scaffold does not prove either offline behavior or UI parity.
-
-## Reconciled target tree
-
-The repository structure document is the canonical, human-readable map. The practical implementation order should be:
-
-1. Flutter project bootstrap and pinned dependencies.
-2. App shell, theme tokens, startup and navigation skeleton.
-3. Drift database foundation: schema version, tables, DAOs, constraints, migration strategy and migration tests.
-4. Domain contracts and tests for financial ledger, assignment history, attendance and academic versioning.
-5. Managed file ownership/retention, offline PDF snapshots, then backup/restore protocol.
-6. Offline license verification and operation-level entitlement matrix.
-7. Feature UI implementation against the locked reference.
-8. Static analysis, unit/database/migration/workflow tests, offline device tests, then APK build.
-
-Do not start finance or migration implementation until pending policies P-01/P-02 and relevant schema decisions are resolved. Do not claim restore readiness until P-03/P-06 and backup invariants have evidence. Do not gate or enable individual actions solely by tier until P-07's operation-level entitlement matrix is approved.
-
-## Pending decisions preserved
-
-The following remain unresolved in the developer specification and are not silently decided by this reconciliation:
-- P-01: opening-balance provenance and ambiguous legacy balance handling.
-- P-02: refund lifecycle/cancellation stages.
-- P-03: exact PDF-byte retention by document type.
-- P-04: salary correction vs actual cash recovery.
-- P-05: result correction and certificate review.
-- P-06: restore journal/audit survival architecture.
-- P-07: operation-level license entitlement matrix.
-
-Existing SC-01 through SC-10 decisions remain planning decisions, not implementation evidence. CC-01 through CC-16 consistency items and B-01 through B-20 evidence blockers remain open until supported by source/tests or approved decisions.
-
-## Verification result
-
-- Repository identity and branch were checked through GitHub.
-- The scaffold tree was readable and not truncated.
-- This reconciliation updates planning documentation only.
-- No Dart implementation, database migration, dependency lockfile, test, or build was created or executed.
-- The repository is still **not a compilable Flutter app**.
+- **Database foundation:** PASS for the implemented Phase 3 scope on the last verified code commit.
+- **Complete product:** NOT COMPLETE.
+- **P-01–P-07:** PENDING authorized product/business decisions.
+- **Release readiness:** NOT CLEARED.
+- **PRs:** keep both open/draft until current CI evidence, integration review and phase-specific acceptance criteria are satisfied. Do not merge merely because one CI run is green.
