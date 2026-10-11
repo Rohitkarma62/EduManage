@@ -27,9 +27,9 @@
 ## Latest repository verification
 
 - Branch: `phase-3/database-foundation`
-- Code commit validated by the latest CI run: `c46e341bd74517c91ec8fbf418fa7be18c6fe966`.
-- Audit documentation update: `141ab3610f2da562e866801970827dc5977b515f`.
-- Latest verified CI run for the database code: [Run #48](https://github.com/Rohitkarma62/EduManage/actions/runs/38077985845), completed successfully. The documentation-only update has not yet been independently re-run by CI.
+- Latest audited code commit: `c46e341bd74517c91ec8fbf418fa7be18c6fe966`.
+- Audit documentation commits: `141ab3610f2da562e866801970827dc5977b515f` and `ac09754fe8871770aa00f55e5a6a976bf6c31c74`.
+- Latest observed CI run: [Run #50](https://github.com/Rohitkarma62/EduManage/actions/runs/38107462863), completed successfully against the documentation update commit.
 - Verified successful steps: pinned Flutter SDK setup, toolchain check, dependency resolution, Drift code generation, `flutter analyze`, `flutter test`, and generated-files step.
 - Student DAO tests cover normalization, blank-name rejection, stable pagination, invalid pagination inputs, updates, missing IDs, and soft deactivation.
 - Assignment tests cover foreign keys, missing references, uniqueness scopes, adjacent/overlapping ranges, invalid ranges, raw-SQL integrity enforcement, and change-reason normalization.
@@ -45,6 +45,6 @@
 
 ## Final audit disposition
 
-**Database code/CI gate: PASS for the current Phase 3 scope.** This means the current latest commit passed the listed CI steps; it does not prove every product requirement or production scenario.
+**Database code/CI gate: PASS for the current Phase 3 scope.** This means the current latest code commit passed the listed CI steps; it does not prove every product requirement or production scenario.
 
 **Merge gate: NOT CLEARED.** Keep PR #2 open as draft until the base/integration review, canonical schema export, and approved product-spec reconciliation are completed. Do not merge merely because CI is green.
