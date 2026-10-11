@@ -1,47 +1,49 @@
 # Phase 3: Database Foundation
 
-**Status:** Initial local database foundation implemented; not product-complete or release-ready. Schema version 3 adds SQLite-level assignment integrity and derived-scope-key triggers. CI run #28 passed Drift code generation, Flutter analysis, and the full Flutter test suite for the foreign-key startup-guard regression test.
+**Status:** Database foundation v4 is implemented and the latest CI run passes. This is a verified database slice, not a complete product or release-ready application. PR #2 remains draft and must not be merged as part of this audit.
 
-## Scope of this first slice
+## Verified scope
 
-- Local SQLite database opened from app-private application-support storage.
-- Drift schema version 3. Version 2 added assignment integrity triggers; version 3 added assignment scope-key integrity triggers.
-- Institute settings, students, class groups, batches, and effective-dated student assignments.
-- Foreign-key enforcement enabled before normal queries; `PRAGMA foreign_key_check` is checked when opening the database.
-- Basic local student create/list/find/update-contact/deactivate operations.
-- Student DAO tests for local create/read, blank-name rejection, and soft deactivation.
-- Assignment tests for adjacent half-open intervals, overlap rejection, batch/class mismatch, direct foreign-key rejection, uniqueness scopes, and non-positive interval rejection.
-- No network dependency and no cloud storage.
+- Local SQLite database in app-private application-support storage; no network or cloud dependency in this slice.
+- Drift tables: institute settings, students, class groups, batches, and effective-dated student assignments.
+- Foreign keys enabled and checked at database open. Existing foreign-key violations prevent normal opening.
+- Student DAO supports create, active-list pagination, find, contact update, and soft deactivation.
+- Assignment DAO validates student/class/batch references, positive date ranges, and overlapping intervals in a transaction.
+- SQLite triggers enforce assignment overlap, batch/class consistency, derived scope keys, and positive date ranges even for direct SQL writes.
+- Class names are unique; batch names are unique within a class and may repeat in different classes.
+- Student deactivation preserves the row and its assignment history.
 
-## Schema integrity rules
+## Schema and migration policy
 
-- Class names are unique; batch names are unique within a class. The same batch name may exist in different classes.
-- Student assignment intervals are half-open: [effective_from, effective_to); a null end means currently open-ended.
-- DAO validation rejects overlapping intervals and a batch/class mismatch before writing.
-- SQLite triggers also reject overlapping assignments and batch/class mismatches for direct SQL writes, so bypassing the DAO does not bypass these invariants.
-- Assignment scope keys are derived values: `class:<class_id>` when there is no batch, otherwise `batch:<batch_id>`. SQLite triggers reject mismatched scope keys on direct inserts and updates.
-- Foreign keys prevent assignments or batches from referencing missing rows. Existing foreign-key violations are checked at database open; a regression test verifies opening is refused for a deliberately corrupt database.
-- Student deactivation is a soft state change; historical assignments are not erased as a side effect.
+- Schema version 1 is the frozen historical development schema used by the migration fixture.
+- Version 2 added four assignment integrity triggers: batch/class consistency and overlap checks for inserts and updates.
+- Version 3 added two derived assignment-scope-key triggers.
+- Version 4 added two assignment date-range triggers and refuses migration if a legacy assignment has a non-null end date less than or equal to its start date.
+- Upgrade trigger DDL runs inside a transaction. It does not intentionally repair or delete invalid legacy records.
+- The in-memory v1 fixture exercises v1-to-v4 migration, seeded-data preservation, indexes, trigger installation, and post-migration integrity.
+- Failure rollback regression tests cover failed v1, v2, and v3 upgrades. They verify schema version and existing rows/triggers survive and newly-created triggers are rolled back.
+- The frozen v1 fixture is manually maintained. Re-review it whenever the historical schema changes.
 
-## Migration policy and verification
+## Latest repository verification
 
-- Schema version 1 was the initial development schema. Version 2 added four assignment integrity triggers. Version 3 added two assignment scope-key triggers.
-- `onUpgrade` installs the appropriate triggers for v1/v2 databases; it does not drop or recreate user tables.
-- The in-memory SQLite v1 fixture exercises Drift's actual v1-to-v3 upgrade path, preserves seeded institute/student/class/batch/assignment records, checks that the six v1 indexes remain, verifies all six v2/v3 triggers, and tests that overlap enforcement still works after migration. The fixture's frozen DDL matches the v1 table columns, foreign keys, boolean constraints, and six declared indexes. Drift's text-length constraints are client-side validation, not SQLite table CHECK constraints, so they are intentionally absent from the frozen SQL fixture. Re-review this fixture whenever the historical v1 schema changes.
-- Regression tests exercise direct SQL inserts/updates against interval, class/batch, and scope-key invariants.
-- CI run #28 passed pinned Flutter setup, dependency resolution, Drift code generation, `flutter analyze`, `flutter test`, and the generated-files step.
-- No Gradle task, APK build, or device-level test is authorized or claimed.
-- SQLite WAL mode is enabled for the app connection. Backup/restore consistency and device-level migration behavior remain unverified. Migration-failure rollback behavior still needs a dedicated regression test.
+- Branch: `phase-3/database-foundation`
+- Latest audited commit: `c46e341bd74517c91ec8fbf418fa7be18c6fe966`
+- Latest CI run: [Run #48](https://github.com/Rohitkarma62/EduManage/actions/runs/38077985845), completed successfully.
+- Verified successful steps: pinned Flutter SDK setup, toolchain check, dependency resolution, Drift code generation, `flutter analyze`, `flutter test`, and generated-files step.
+- Student DAO tests cover normalization, blank-name rejection, stable pagination, invalid pagination inputs, updates, missing IDs, and soft deactivation.
+- Assignment tests cover foreign keys, missing references, uniqueness scopes, adjacent/overlapping ranges, invalid ranges, raw-SQL integrity enforcement, and change-reason normalization.
+- No Gradle task, APK build, device test, or PR merge was run or claimed.
 
-## Still out of scope
+## Remaining boundaries and risks
 
-Money, fee ledgers, opening balances, payments, refunds, salary, discounts/credits, exams, results, certificates, backups and licensing are not part of this schema slice. They require their approved invariants and unresolved decisions P-01 through P-07 where applicable. Do not invent accounting semantics to fill schema gaps.
+- This slice does not implement the fee ledger, opening balances, payments, refunds, salary, discounts/credits, exams, results, certificates, backup/restore, or license enforcement. The unresolved product decisions P-01 through P-07 remain applicable; do not invent accounting or lifecycle rules to fill them.
+- WAL is enabled, but device-level migration behavior and consistent backup/restore handling are not verified here.
+- A canonical schema export should be committed before the next schema-version change.
+- The Android application ID and release signing configuration still need product/release review in the appropriate phase.
+- The current CI is a repository verification workflow, not a release build or device compatibility proof.
 
-## Review gates before merge
+## Final audit disposition
 
-1. Fresh CI must pass on the latest Phase 3 commit, including migration, analysis, and all tests.
-2. Re-review the frozen v1 fixture whenever schema definitions change; it is manually maintained and can drift.
-3. Commit a canonical schema export before the next schema-version change.
-4. Add and verify a dedicated migration-failure rollback regression test before treating migration safety as closed.
-5. Re-review the first schema against the approved product specification before adding financial tables.
-6. PR #2 remains draft and must not be merged as part of this work. CI success alone is not product readiness.
+**Database code/CI gate: PASS for the current Phase 3 scope.** This means the current latest commit passed the listed CI steps; it does not prove every product requirement or production scenario.
+
+**Merge gate: NOT CLEARED.** Keep PR #2 open as draft until the base/integration review, canonical schema export, and approved product-spec reconciliation are completed. Do not merge merely because CI is green.
