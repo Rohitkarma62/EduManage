@@ -17,6 +17,7 @@ part 'app_database.g.dart';
   StudentAssignments,
   AttendanceSessions,
   AttendanceEntries,
+  AttendanceCorrections,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -24,7 +25,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -53,6 +54,9 @@ class AppDatabase extends _$AppDatabase {
               await m.createTable(attendanceSessions);
               await m.createTable(attendanceEntries);
               await _createAttendanceScopeTriggers();
+            }
+            if (from < 6) {
+              await m.createTable(attendanceCorrections);
             }
           });
         },
