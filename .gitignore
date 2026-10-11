@@ -25,7 +25,7 @@ key.properties
 secrets/
 private_keys/
 
-# Local databases, exports, backups and generated documents
+# Local databases and runtime exports/backups
 *.sqlite
 *.sqlite3
 *.db
@@ -33,4 +33,11 @@ private_keys/
 *.db-shm
 *.backup
 *.bak
-*.pdf
+/local_data/
+/exports/
+/backups/
+/generated_documents/
+
+# Do not globally ignore *.pdf: intentional bundled PDF templates and documentation
+# may be version-controlled. Customer-generated PDFs must remain in app-private
+# runtime storage and must never be copied into the repository.
