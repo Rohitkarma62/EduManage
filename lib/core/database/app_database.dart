@@ -194,22 +194,6 @@ class AppDatabase extends _$AppDatabase {
       END
     ''');
   }
-}
-
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final directory = await getApplicationSupportDirectory();
-    final file = p.join(directory.path, 'edumanage.sqlite');
-    return NativeDatabase.createInBackground(
-      File(file),
-      setup: (database) {
-        database.execute('PRAGMA foreign_keys = ON');
-        database.execute('PRAGMA journal_mode = WAL');
-      },
-    );
-  });
-}
-
 
   Future<void> _createAttendanceScopeTriggers() async {
     await customStatement('''
@@ -258,3 +242,18 @@ LazyDatabase _openConnection() {
       END
     ''');
   }
+}
+
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final directory = await getApplicationSupportDirectory();
+    final file = p.join(directory.path, 'edumanage.sqlite');
+    return NativeDatabase.createInBackground(
+      File(file),
+      setup: (database) {
+        database.execute('PRAGMA foreign_keys = ON');
+        database.execute('PRAGMA journal_mode = WAL');
+      },
+    );
+  });
+}
