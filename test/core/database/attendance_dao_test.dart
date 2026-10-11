@@ -107,5 +107,10 @@ void main() {
       confirmHistoricalEdit: true, correctionReason: 'Teacher confirmed register',
     );
     expect((await attendance.listEntries(id)).single.status, 'present');
+    final corrections = await db.select(db.attendanceCorrections).get();
+    expect(corrections, hasLength(1));
+    expect(corrections.single.previousStatus, 'unmarked');
+    expect(corrections.single.newStatus, 'present');
+    expect(corrections.single.reason, 'Teacher confirmed register');
   });
 }
