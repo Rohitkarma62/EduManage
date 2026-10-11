@@ -53,10 +53,29 @@ class AppDatabase extends _$AppDatabase {
             if (from < 5) {
               await m.createTable(attendanceSessions);
               await m.createTable(attendanceEntries);
+              // Drift's createTable migration helper does not create declared
+              // indexes for an individual table. Add them explicitly so
+              // upgraded databases match the fresh-install schema.
+              await customStatement('''
+                CREATE UNIQUE INDEX attendance_sessions_scope_date_unique
+                ON attendance_sessions (attendance_scope_key, attendance_date)
+              ''');
+              await customStatement('''
+                CREATE UNIQUE INDEX attendance_entries_session_student_unique
+                ON attendance_entries (session_id, student_id)
+              ''');
+              await customStatement('''
+                CREATE INDEX attendance_entries_student_idx
+                ON attendance_entries (student_id)
+              ''');
               await _createAttendanceScopeTriggers();
             }
             if (from < 6) {
               await m.createTable(attendanceCorrections);
+              await customStatement('''
+                CREATE INDEX attendance_corrections_entry_time_idx
+                ON attendance_corrections (entry_id, corrected_at)
+              ''');
             }
           });
         },
