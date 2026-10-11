@@ -27,8 +27,9 @@
 ## Latest repository verification
 
 - Branch: `phase-3/database-foundation`
-- Latest audited commit: `c46e341bd74517c91ec8fbf418fa7be18c6fe966`
-- Latest CI run: [Run #48](https://github.com/Rohitkarma62/EduManage/actions/runs/38077985845), completed successfully.
+- Code commit validated by the latest CI run: `c46e341bd74517c91ec8fbf418fa7be18c6fe966`.
+- Audit documentation update: `141ab3610f2da562e866801970827dc5977b515f`.
+- Latest verified CI run for the database code: [Run #48](https://github.com/Rohitkarma62/EduManage/actions/runs/38077985845), completed successfully. The documentation-only update has not yet been independently re-run by CI.
 - Verified successful steps: pinned Flutter SDK setup, toolchain check, dependency resolution, Drift code generation, `flutter analyze`, `flutter test`, and generated-files step.
 - Student DAO tests cover normalization, blank-name rejection, stable pagination, invalid pagination inputs, updates, missing IDs, and soft deactivation.
 - Assignment tests cover foreign keys, missing references, uniqueness scopes, adjacent/overlapping ranges, invalid ranges, raw-SQL integrity enforcement, and change-reason normalization.
